@@ -39,7 +39,8 @@ import {
   ExternalLink,
   ChevronRight,
   Search,
-  Trash2
+  Trash2,
+  Users
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -281,7 +282,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-amber-500">
         <Sparkles className="w-16 h-16 animate-pulse mb-4" />
-        <p className="animate-pulse font-black text-2xl tracking-widest uppercase">جاري التحميل...</p>
+        <p className="animate-pulse font-black text-2xl tracking-widest uppercase text-center px-4">جاري التحميل...</p>
       </div>
     );
   }
@@ -307,7 +308,7 @@ export default function App() {
               </div>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 mb-4 drop-shadow-2xl">مسابقة رمضان</h1>
-            <p className="text-amber-100/60 text-lg sm:text-xl lg:text-2xl font-medium tracking-wide italic underline decoration-amber-500/20">رحلة إيمانية وجوائز يومية في شهر الخير</p>
+            <p className="text-amber-100/60 text-lg sm:text-xl lg:text-2xl font-medium tracking-wide italic underline decoration-amber-500/20 text-center">رحلة إيمانية وجوائز يومية في شهر الخير</p>
           </header>
         )}
 
@@ -329,9 +330,9 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-8 sm:p-12 shadow-[0_0_80px_-15px_rgba(245,158,11,0.2)] relative overflow-hidden group">
+            <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-8 sm:p-12 shadow-[0_0_80px_-15px_rgba(245,158,11,0.2)] relative overflow-hidden group text-center">
               <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px]"></div>
-              <div className="flex items-center gap-4 mb-8">
+              <div className="flex items-center justify-center gap-4 mb-8">
                 <Sparkles size={24} className="text-amber-400" />
                 <h2 className="text-amber-400 font-bold text-xl italic underline decoration-amber-500/30">سؤال اليوم:</h2>
               </div>
@@ -353,12 +354,12 @@ export default function App() {
           </main>
         )}
 
-        {/* --- View: Registration Form --- */}
+        {/* --- View: Form --- */}
         {view === 'form' && (
           <main className="bg-slate-900/60 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-left-12 duration-700 w-full max-w-2xl mx-auto">
             <button onClick={() => setView('home')} className="text-slate-400 hover:text-amber-400 mb-10 flex items-center gap-2 text-base font-black"><ChevronRight size={24} /> العودة للسؤال</button>
             <h2 className="text-3xl font-black mb-12 text-white flex items-center gap-5 underline decoration-amber-500/20">سجل بياناتك للمشاركة</h2>
-            <form onSubmit={handleFormSubmit} className="space-y-8">
+            <form onSubmit={handleFormSubmit} className="space-y-8 text-right">
               <input required className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all text-xl" placeholder="الاسم الثلاثي..." value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <input required type="tel" className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all text-xl" placeholder="رقم الموبايل" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
@@ -388,40 +389,38 @@ export default function App() {
           </main>
         )}
 
-        {/* --- View: Admin Login --- */}
-        {view === 'admin_login' && (
-          <main className="bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-10 shadow-2xl animate-in fade-in duration-500 w-full max-w-lg mx-auto">
-            <button onClick={() => setView('home')} className="text-slate-500 hover:text-amber-400 mb-8 flex items-center gap-2 text-sm font-black transition-all group">
-              <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} /> الخروج
-            </button>
-            <div className="text-center mb-8">
-               <div className="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/20"><Lock size={32} /></div>
-               <h2 className="text-2xl font-black text-white tracking-tighter uppercase">بوابة المسؤولين</h2>
-            </div>
-            <form onSubmit={handleAdminLogin} className="space-y-4">
-              <input required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 outline-none focus:border-amber-500 text-center font-bold" placeholder="اسم المستخدم" value={loginData.user} onChange={e => setLoginData({...loginData, user: e.target.value})} />
-              <input required type="password" className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 outline-none focus:border-amber-500 text-center font-bold" placeholder="كلمة المرور" value={loginData.pass} onChange={e => setLoginData({...loginData, pass: e.target.value})} />
-              {loginError && <p className="text-rose-500 text-xs text-center font-black bg-rose-500/10 py-3 rounded-xl">{loginError}</p>}
-              <button type="submit" className="w-full bg-amber-500 text-slate-950 font-black py-5 rounded-2xl shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all">دخول آمن</button>
-            </form>
-          </main>
-        )}
-
         {/* --- View: Admin Dashboard --- */}
         {view === 'admin_dashboard' && (
-          <main className="animate-in slide-in-from-bottom-12 duration-700 space-y-8 pb-32 w-full max-w-4xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-center justify-between mb-10 sticky top-0 bg-slate-950/60 backdrop-blur-3xl py-6 z-20 border-b border-white/5 px-6 rounded-b-[3rem] shadow-2xl gap-4">
-              <div className="flex items-center gap-6">
-                <h2 className="text-3xl font-black text-amber-400 flex items-center gap-4"><Settings size={40} /> لوحة التحكم</h2>
-                <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
-                  <button onClick={() => setAdminTab('settings')} className={`px-6 py-3 rounded-xl font-black text-sm transition-all ${adminTab === 'settings' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>الإعدادات</button>
-                  <button onClick={() => setAdminTab('responses')} className={`px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${adminTab === 'responses' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'text-slate-400 hover:text-white'}`}>المشاركات <span className="bg-black/20 px-2 py-0.5 rounded-lg text-xs">{responses.length}</span></button>
+          <main className="animate-in slide-in-from-bottom-12 duration-700 space-y-8 pb-32 w-full max-w-4xl mx-auto text-right">
+            {/* Header of Admin Dashboard with Tab Toggle */}
+            <div className="flex flex-col sm:flex-row items-center justify-between mb-10 sticky top-0 bg-slate-950/70 backdrop-blur-3xl py-6 z-20 border-b border-white/5 px-6 rounded-b-[3rem] shadow-2xl gap-6">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <h2 className="text-3xl font-black text-amber-400 flex items-center gap-4"><Settings size={40} /> الإدارة</h2>
+                
+                {/* Tab Switcher - VERY IMPORTANT: This is where you switch to see participants */}
+                <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 shadow-inner">
+                  <button 
+                    onClick={() => setAdminTab('settings')} 
+                    className={`px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${adminTab === 'settings' ? 'bg-amber-500 text-slate-950 shadow-lg scale-105' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  >
+                    <ImageIcon size={18}/> الإعدادات
+                  </button>
+                  <button 
+                    onClick={() => setAdminTab('responses')} 
+                    className={`px-6 py-3 rounded-xl font-black text-sm transition-all flex items-center gap-2 ${adminTab === 'responses' ? 'bg-amber-500 text-slate-950 shadow-lg scale-105' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  >
+                    <Users size={18}/> المشاركات 
+                    <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${adminTab === 'responses' ? 'bg-black/20' : 'bg-white/10'}`}>
+                      {responses.length}
+                    </span>
+                  </button>
                 </div>
               </div>
-              <button onClick={() => setView('home')} className="text-rose-400 text-sm font-black bg-rose-500/10 px-8 py-4 rounded-2xl border border-rose-500/20 hover:bg-rose-500/20 transition-all uppercase tracking-widest">خروج</button>
+              <button onClick={() => setView('home')} className="text-rose-400 text-sm font-black bg-rose-500/10 px-10 py-4 rounded-2xl border border-rose-500/20 hover:bg-rose-500/20 transition-all uppercase tracking-widest shadow-lg active:scale-95">خروج</button>
             </div>
 
             {adminTab === 'settings' ? (
+              /* Tab 1: Global Settings */
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-500">
                 <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-10 shadow-2xl border-t-8 border-t-amber-500">
                   <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4"><Send size={24} className="text-amber-500"/> سؤال اليوم</h3>
@@ -430,8 +429,8 @@ export default function App() {
                 <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-10 shadow-2xl border-t-8 border-t-emerald-500">
                   <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4"><Clock size={24} className="text-emerald-500"/> الجدولة الزمنية (24h)</h3>
                   <div className="grid grid-cols-2 gap-8">
-                    <div><label className="text-xs text-slate-500 font-black mb-3 block">الفتح</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-emerald-400" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} /></div>
-                    <div><label className="text-xs text-slate-500 font-black mb-3 block">الغلق</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-rose-400" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} /></div>
+                    <div><label className="text-xs text-slate-500 font-black mb-3 block">الفتح</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-emerald-400 shadow-inner" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} /></div>
+                    <div><label className="text-xs text-slate-500 font-black mb-3 block">الغلق</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-rose-400 shadow-inner" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} /></div>
                   </div>
                 </div>
                 <div className="lg:col-span-2 bg-slate-900/60 border border-white/10 rounded-[3rem] p-10 shadow-2xl border-t-8 border-t-blue-500 grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -448,44 +447,65 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-6 animate-in fade-in duration-500">
+              /* Tab 2: Participants / Responses - THIS IS THE TABLE YOU ARE LOOKING FOR */
+              <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl">
                   <div className="relative w-full md:w-96">
                     <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl py-4 pr-14 pl-6 outline-none focus:border-amber-500 text-lg" placeholder="ابحث بالاسم أو الرقم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input 
+                      className="w-full bg-slate-950 border border-white/10 rounded-2xl py-4 pr-14 pl-6 outline-none focus:border-amber-500 text-lg shadow-inner transition-all" 
+                      placeholder="ابحث بالاسم أو رقم السحب..." 
+                      value={searchQuery} 
+                      onChange={e => setSearchQuery(e.target.value)} 
+                    />
                   </div>
-                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl"><Download size={24} /> تحميل Excel</button>
+                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl active:scale-95"><Download size={24} /> تحميل كشف Excel (كامل)</button>
                 </div>
+                
                 <div className="bg-slate-900/40 backdrop-blur-3xl border border-white/10 rounded-[3rem] overflow-hidden shadow-2xl">
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-white/10">
                     <table className="w-full text-right border-collapse">
                       <thead>
-                        <tr className="bg-white/5 text-amber-400 border-b border-white/10">
-                          <th className="px-6 py-6 font-black text-sm">رقم السحب</th>
-                          <th className="px-6 py-6 font-black text-sm">المشترك</th>
-                          <th className="px-6 py-6 font-black text-sm">الإجابة</th>
-                          <th className="px-6 py-6 font-black text-sm">الحالة</th>
-                          <th className="px-6 py-6 font-black text-sm">إجراء</th>
+                        <tr className="bg-white/5 text-amber-400 border-b border-white/10 uppercase tracking-widest text-xs">
+                          <th className="px-6 py-6 font-black">رقم السحب</th>
+                          <th className="px-6 py-6 font-black">بيانات المشترك</th>
+                          <th className="px-6 py-6 font-black">الإجابة المكتوبة</th>
+                          <th className="px-6 py-6 font-black">الحالة والشروط</th>
+                          <th className="px-6 py-6 font-black text-center">إجراءات</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {filteredResponses.length > 0 ? filteredResponses.map((res) => (
-                          <tr key={res.id} className="hover:bg-white/[0.02] transition-colors group">
-                            <td className="px-6 py-6 font-black text-amber-500 text-xl tracking-tighter">#{res.uniqueId}</td>
+                          <tr key={res.id} className="hover:bg-white/[0.03] transition-colors group">
+                            <td className="px-6 py-6">
+                              <span className="font-black text-amber-500 text-2xl tracking-tighter bg-amber-500/10 px-4 py-2 rounded-xl border border-amber-500/20">#{res.uniqueId}</span>
+                            </td>
                             <td className="px-6 py-6">
                               <div className="font-black text-white text-lg">{res.name}</div>
-                              <div className="text-slate-400 text-sm">{res.phone}</div>
-                              <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-xs flex items-center gap-1 mt-1 hover:underline"><Facebook size={12}/> بروفايل</a>
+                              <div className="text-slate-400 text-sm font-bold mt-1 flex items-center gap-1"><Phone size={12}/> {res.phone}</div>
+                              <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-xs flex items-center gap-1 mt-2 hover:underline font-black bg-blue-400/10 w-fit px-2 py-1 rounded-md"><Facebook size={12}/> رابط الفيسبوك</a>
+                              <div className="text-slate-500 text-[10px] mt-1 italic max-w-[150px] truncate">{res.address}</div>
                             </td>
-                            <td className="px-6 py-6 max-w-xs text-slate-300 text-sm italic">"{res.answer}"</td>
+                            <td className="px-6 py-6 max-w-xs">
+                              <div className="text-slate-300 text-sm italic leading-relaxed bg-slate-950/40 p-4 rounded-2xl border border-white/5 shadow-inner line-clamp-4">
+                                {res.answer}
+                              </div>
+                            </td>
                             <td className="px-6 py-6">
-                              <button onClick={() => toggleVerify(res.id, res.verified)} className={`px-4 py-2 rounded-xl font-black text-xs transition-all border ${res.verified ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}>
-                                {res.verified ? 'مستوفي الشروط' : 'قيد المراجعة'}
+                              <button 
+                                onClick={() => toggleVerify(res.id, res.verified)} 
+                                className={`px-5 py-3 rounded-xl font-black text-xs transition-all border flex items-center gap-2 shadow-lg ${res.verified ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}
+                              >
+                                {res.verified ? <><CheckCircle2 size={16}/> مستوفي</> : <><div className="w-3 h-3 rounded-full border border-slate-700"/> قيد المراجعة</>}
                               </button>
                             </td>
-                            <td className="px-6 py-6"><button onClick={() => deleteResponse(res.id)} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"><Trash2 size={20} /></button></td>
+                            <td className="px-6 py-6 text-center">
+                              <button onClick={() => deleteResponse(res.id)} className="p-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all active:scale-90 group-hover:opacity-100 opacity-0 md:opacity-10 shadow-lg"><Trash2 size={24} /></button>
+                            </td>
                           </tr>
-                        )) : <tr><td colSpan="5" className="px-6 py-20 text-center text-slate-500 font-black tracking-widest uppercase">لا يوجد مشتركين</td></tr>}
+                        )) : (
+                          <tr><td colSpan="5" className="px-6 py-32 text-center text-slate-500 font-black text-2xl tracking-[0.2em] italic uppercase">لا يوجد مشتركين مسجلين حالياً</td></tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -495,11 +515,30 @@ export default function App() {
           </main>
         )}
 
-        {/* Footer Admin Link */}
+        {/* --- View: Admin Login --- */}
+        {view === 'admin_login' && (
+          <main className="bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-10 shadow-2xl animate-in fade-in duration-500 w-full max-w-lg mx-auto">
+            <button onClick={() => setView('home')} className="text-slate-500 hover:text-amber-400 mb-8 flex items-center gap-2 text-sm font-black transition-all group">
+              <ChevronRight className="group-hover:translate-x-1 transition-transform" size={20} /> العودة للموقع
+            </button>
+            <div className="text-center mb-8">
+               <div className="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/20 shadow-xl"><Lock size={32} /></div>
+               <h2 className="text-2xl font-black text-white tracking-tighter uppercase">دخول الإدارة الآمن</h2>
+            </div>
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <input required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 outline-none focus:border-amber-500 text-center font-bold text-xl shadow-inner" placeholder="اسم المستخدم" value={loginData.user} onChange={e => setLoginData({...loginData, user: e.target.value})} />
+              <input required type="password" className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 outline-none focus:border-amber-500 text-center font-bold text-xl shadow-inner" placeholder="كلمة المرور" value={loginData.pass} onChange={e => setLoginData({...loginData, pass: e.target.value})} />
+              {loginError && <p className="text-rose-500 text-sm text-center font-black bg-rose-500/10 py-3 rounded-xl border border-rose-500/20">{loginError}</p>}
+              <button type="submit" className="w-full bg-amber-500 text-slate-950 font-black py-5 rounded-2xl shadow-[0_15px_40px_rgba(245,158,11,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all text-xl">دخول</button>
+            </form>
+          </main>
+        )}
+
+        {/* Footer with Admin Access Link */}
         {view === 'home' && (
           <footer className="mt-16 text-center relative z-10 opacity-20 hover:opacity-100 transition-all duration-1000 delay-500 pb-10">
-            <button onClick={() => setView('admin_login')} className="text-[12px] text-slate-500 hover:text-amber-500 transition-colors tracking-[0.8em] flex items-center justify-center gap-3 mx-auto uppercase font-black italic">
-              <Lock size={12} /> Access Control System
+            <button onClick={() => setView('admin_login')} className="text-[12px] text-slate-500 hover:text-amber-500 transition-colors tracking-[0.8em] flex items-center justify-center gap-3 mx-auto uppercase font-black italic group">
+              <Lock size={12} className="group-hover:animate-bounce" /> Access Control System
             </button>
             <p className="text-slate-700 text-[10px] mt-8 font-black tracking-[0.4em] italic uppercase">© 2024 Ramadan Al-Khair • Powered by Gemini AI</p>
           </footer>
