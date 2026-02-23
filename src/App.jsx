@@ -80,7 +80,7 @@ const AnimatedBackground = () => {
   })), []);
 
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-[#01040f]">
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-[#01040f] w-full h-full">
       <style>{`
         @keyframes floatMoon {
           0%, 100% { transform: translateY(0) rotate(12deg); filter: drop-shadow(0 0 40px rgba(245, 158, 11, 0.3)); }
@@ -278,28 +278,32 @@ export default function App() {
     link.click();
   };
 
+  // --- LOADING SCREEN FIX ---
   if (loading && view !== 'success') {
     return (
-      <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center text-amber-500">
-        <Sparkles className="w-16 h-16 animate-pulse mb-4" />
-        <p className="animate-pulse font-black text-2xl tracking-widest uppercase text-center px-4">جاري التحميل...</p>
+      <div className="fixed inset-0 bg-[#01040f] z-[999] flex flex-col items-center justify-center text-amber-500 overflow-hidden">
+        <AnimatedBackground />
+        <div className="relative z-10 flex flex-col items-center gap-6">
+          <Sparkles className="w-20 h-20 animate-pulse text-amber-400" />
+          <p className="animate-pulse font-black text-3xl tracking-[0.2em] uppercase text-center px-4">جاري التحميل...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen text-slate-100 font-sans selection:bg-amber-500/30 overflow-x-hidden flex flex-col items-center justify-center py-6 sm:py-12 lg:py-20" dir="rtl">
+    <div className="min-h-screen w-full bg-[#01040f] text-slate-100 font-sans selection:bg-amber-500/30 overflow-x-hidden flex flex-col items-center py-6 sm:py-12 lg:py-20" dir="rtl">
       <AnimatedBackground />
 
-      {/* Main Container with flexible width */}
-      <div className="relative z-10 w-full max-w-[95%] sm:max-w-xl md:max-w-2xl lg:max-w-4xl mx-auto px-2 sm:px-6">
+      {/* Main Container FIX: Always Centered */}
+      <div className="relative z-10 w-full max-w-[95%] sm:max-w-xl md:max-w-2xl lg:max-w-4xl flex flex-col items-center mx-auto px-4 sm:px-6">
         
-        {/* Unified Header */}
+        {/* Unified Header - Centered */}
         {view !== 'admin_dashboard' && (
-          <header className="text-center mb-8 sm:mb-16 animate-in fade-in slide-in-from-top-10 duration-1000">
+          <header className="text-center mb-8 sm:mb-16 animate-in fade-in slide-in-from-top-10 duration-1000 flex flex-col items-center">
             <div className="relative inline-block group mb-6">
               <div className="absolute inset-0 bg-amber-500/20 rounded-full blur-3xl transition-all group-hover:bg-amber-500/40"></div>
-              <div className="relative w-24 h-24 sm:w-32 lg:w-40 lg:h-40 bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] lg:rounded-[3.5rem] mx-auto flex items-center justify-center shadow-2xl border border-white/20 overflow-hidden transform hover:rotate-3 transition-transform">
+              <div className="relative w-24 h-24 sm:w-32 lg:w-40 lg:h-40 bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] lg:rounded-[3.5rem] flex items-center justify-center shadow-2xl border border-white/20 overflow-hidden transform hover:rotate-3 transition-transform">
                 {config.logoUrl ? (
                   <img src={config.logoUrl} alt="Logo" className="w-full h-full object-cover" />
                 ) : (
@@ -310,8 +314,8 @@ export default function App() {
                 )}
               </div>
             </div>
-            <h1 className="text-3xl sm:text-5xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 mb-4 drop-shadow-2xl">مسابقة رمضان</h1>
-            <p className="text-amber-100/60 text-base sm:text-xl lg:text-2xl font-medium tracking-wide italic text-center px-4">رحلة إيمانية وجوائز يومية في شهر الخير</p>
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 mb-4 drop-shadow-2xl">مسابقة رمضان</h1>
+            <p className="text-amber-100/60 text-base sm:text-xl lg:text-2xl font-medium tracking-wide italic text-center max-w-lg">رحلة إيمانية وجوائز يومية في شهر الخير</p>
           </header>
         )}
 
@@ -339,7 +343,7 @@ export default function App() {
                 <Sparkles size={24} className="text-amber-400" />
                 <h2 className="text-amber-400 font-bold text-xl italic underline decoration-amber-500/30">سؤال اليوم:</h2>
               </div>
-              <p className="text-2xl sm:text-4xl lg:text-5xl font-black leading-[1.3] mb-12 text-slate-50 min-h-[8rem] px-2 sm:px-0">
+              <p className="text-2xl sm:text-4xl lg:text-5xl font-black leading-[1.3] mb-12 text-slate-50 min-h-[8rem] px-2 sm:px-0 max-w-2xl">
                 {isLive ? config.currentQuestion.text : `برجاء انتظار السؤال الجديد في تمام الساعة ${config.startHour > 12 ? config.startHour - 12 : config.startHour} مساءً`}
               </p>
               {isLive ? (
@@ -360,7 +364,7 @@ export default function App() {
         {/* --- View: Form --- */}
         {view === 'form' && (
           <main className="bg-slate-900/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-12 shadow-2xl animate-in slide-in-from-left-12 duration-700 w-full flex flex-col items-center">
-            <div className="w-full flex justify-between items-center mb-10">
+            <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-4 mb-10 text-center">
               <h2 className="text-2xl sm:text-4xl font-black text-white underline decoration-amber-500/20">سجل بياناتك للمشاركة</h2>
               <button onClick={() => setView('home')} className="text-slate-400 hover:text-amber-400 flex items-center gap-2 text-sm sm:text-base font-black transition-all">
                 <ChevronRight size={24} /> العودة
@@ -368,25 +372,21 @@ export default function App() {
             </div>
             
             <form onSubmit={handleFormSubmit} className="space-y-6 sm:space-y-8 w-full text-right flex flex-col items-center">
-              {/* Name Field */}
               <div className="w-full max-w-2xl">
                 <input required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 sm:py-5 px-6 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/50 outline-none transition-all text-lg sm:text-xl text-center" placeholder="الاسم الثلاثي..." value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
               
-              {/* Row: Phone & FB */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 w-full max-w-2xl">
                 <input required type="tel" className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 sm:py-5 px-6 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/50 outline-none transition-all text-lg sm:text-xl text-center" placeholder="رقم الموبايل" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                 <input required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 sm:py-5 px-6 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/50 outline-none transition-all text-lg sm:text-xl text-center" placeholder="رابط الفيسبوك" value={formData.facebook} onChange={e => setFormData({...formData, facebook: e.target.value})} />
               </div>
               
-              {/* Address Field */}
               <div className="w-full max-w-2xl">
                 <input required className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 sm:py-5 px-6 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/50 outline-none transition-all text-lg sm:text-xl text-center" placeholder="العنوان بالتفصيل" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
               </div>
               
-              {/* Answer Field */}
               <div className="w-full max-w-2xl">
-                <textarea required rows="4" className="w-full bg-white/5 border border-white/10 rounded-[2rem] sm:rounded-[2.5rem] py-5 px-8 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/50 outline-none transition-all text-xl sm:text-2xl font-medium text-center" placeholder="إجابتك على السؤال..." value={formData.answer} onChange={e => setFormData({...formData, answer: e.target.value})}></textarea>
+                <textarea required rows="4" className="w-full bg-white/5 border border-white/10 rounded-[2rem] sm:rounded-[2.5rem] py-5 px-8 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/50 outline-none transition-all text-xl sm:text-2xl font-medium text-center leading-relaxed" placeholder="إجابتك على السؤال..." value={formData.answer} onChange={e => setFormData({...formData, answer: e.target.value})}></textarea>
               </div>
 
               <button type="submit" disabled={loading} className="w-full max-w-md bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-800 text-white font-black py-6 sm:py-7 rounded-[2rem] text-xl sm:text-2xl shadow-xl active:scale-95 hover:scale-[1.02] transition-all">
@@ -408,7 +408,7 @@ export default function App() {
               <p className="mt-8 text-amber-400/80 text-base sm:text-lg font-black tracking-wide flex items-center justify-center gap-3"><Camera size={24}/> يرجى تصوير الشاشة (سكرين شوت)</p>
             </div>
             
-            <div className="space-y-6 w-full max-w-md">
+            <div className="space-y-6 w-full max-w-md flex flex-col items-center">
               <a href={config.pageLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-5 w-full py-6 sm:py-7 bg-gradient-to-r from-[#1877F2] to-[#0a51b5] text-white rounded-[2rem] font-black text-xl sm:text-2xl shadow-2xl hover:brightness-110 transition-all"><Facebook size={32} /> تابع النتائج على فيسبوك</a>
               <button onClick={() => setView('home')} className="text-slate-500 text-xs font-black hover:text-amber-400 transition-colors uppercase tracking-[0.4em]">العودة للقائمة الرئيسية</button>
             </div>
@@ -418,7 +418,6 @@ export default function App() {
         {/* --- View: Admin Dashboard --- */}
         {view === 'admin_dashboard' && (
           <main className="animate-in slide-in-from-bottom-12 duration-700 space-y-8 pb-32 w-full flex flex-col items-center text-right">
-            {/* Header of Admin Dashboard with Tab Toggle */}
             <div className="flex flex-col sm:flex-row items-center justify-between mb-10 w-full sticky top-0 bg-slate-950/80 backdrop-blur-3xl py-6 z-20 border-b border-white/5 px-6 rounded-b-[3rem] shadow-2xl gap-6">
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <h2 className="text-3xl font-black text-amber-400 flex items-center gap-4"><Settings size={40} /> لوحة التحكم</h2>
@@ -433,11 +432,11 @@ export default function App() {
             {adminTab === 'settings' ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-500 w-full">
                 <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 sm:p-10 shadow-2xl border-t-8 border-t-amber-500 flex flex-col items-center">
-                  <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4 w-full"><Send size={24} className="text-amber-500"/> سؤال اليوم</h3>
+                  <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4 w-full justify-center"><Send size={24} className="text-amber-500"/> سؤال اليوم</h3>
                   <textarea className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 outline-none focus:border-amber-500 text-white text-xl h-40 leading-relaxed text-center" defaultValue={config.currentQuestion.text} onBlur={(e) => updateGlobalSettings({ currentQuestion: { text: e.target.value, id: Date.now() } })}></textarea>
                 </div>
                 <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 sm:p-10 shadow-2xl border-t-8 border-t-emerald-500 flex flex-col items-center">
-                  <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4 w-full"><Clock size={24} className="text-emerald-500"/> الجدولة الزمنية</h3>
+                  <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4 w-full justify-center"><Clock size={24} className="text-emerald-500"/> الجدولة الزمنية</h3>
                   <div className="grid grid-cols-2 gap-8 w-full">
                     <div className="text-center"><label className="text-xs text-slate-500 font-black mb-3 block uppercase tracking-widest">ساعة البدء</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-emerald-400 shadow-inner" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} /></div>
                     <div className="text-center"><label className="text-xs text-slate-500 font-black mb-3 block uppercase tracking-widest">ساعة الغلق</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-rose-400 shadow-inner" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} /></div>
@@ -445,12 +444,12 @@ export default function App() {
                 </div>
                 <div className="lg:col-span-2 bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 sm:p-10 shadow-2xl border-t-8 border-t-blue-500 grid grid-cols-1 md:grid-cols-2 gap-10 w-full">
                   <div className="space-y-6 flex flex-col items-center">
-                    <h3 className="text-xl font-black text-white flex items-center gap-4 w-full"><ShieldCheck size={24} className="text-blue-500"/> الهوية</h3>
+                    <h3 className="text-xl font-black text-white flex items-center gap-4 w-full justify-center"><ShieldCheck size={24} className="text-blue-500"/> الهوية</h3>
                     <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" placeholder="رابط اللوجو" defaultValue={config.logoUrl} onBlur={(e) => updateGlobalSettings({ logoUrl: e.target.value })} />
                     <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" placeholder="رابط الفيسبوك" defaultValue={config.pageLink} onBlur={(e) => updateGlobalSettings({ pageLink: e.target.value })} />
                   </div>
                   <div className="space-y-6 flex flex-col items-center">
-                    <h3 className="text-xl font-black text-white flex items-center gap-4 w-full"><Key size={24} className="text-blue-400"/> الأمان</h3>
+                    <h3 className="text-xl font-black text-white flex items-center gap-4 w-full justify-center"><Key size={24} className="text-blue-400"/> الأمان</h3>
                     <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" placeholder="يوزر الإدارة" onBlur={e => e.target.value && updateGlobalSettings({adminUser: e.target.value})} />
                     <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" type="password" placeholder="باسورد جديد" onBlur={e => e.target.value && updateAdminPass(e.target.value)} />
                   </div>
@@ -554,9 +553,10 @@ export default function App() {
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .animate-in { animation-duration: 0.8s; animation-fill-mode: both; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-track { background: #01040f; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #fbbf24; }
+        body { background-color: #01040f; margin: 0; padding: 0; }
       `}</style>
     </div>
   );
