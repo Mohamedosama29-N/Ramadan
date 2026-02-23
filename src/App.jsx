@@ -183,17 +183,31 @@ export default function App() {
     return () => unsubscribe();
   }, [user, view]);
 
-  // 4. Timer Logic
+  // 4. Improved Timer Logic (Handles 1-12 and Overnight ranges)
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      const h = now.getHours();
-      const live = h >= config.startHour && h < config.endHour;
+      const h = now.getHours(); // 0-23
+      
+      // Smart Range Logic: Handles 20 to 2 (overnight) and 1 to 12
+      let live = false;
+      if (config.startHour < config.endHour) {
+        live = h >= config.startHour && h < config.endHour;
+      } else {
+        // e.g. Start at 22:00 and end at 02:00
+        live = h >= config.startHour || h < config.endHour;
+      }
+      
       setIsLive(live);
+
       if (live) {
         const end = new Date();
-        if (config.endHour === 24) end.setHours(24, 0, 0, 0);
-        else end.setHours(config.endHour, 0, 0, 0);
+        if (h >= config.startHour && config.startHour > config.endHour) {
+          // If we are in the late hours of a range ending tomorrow
+          end.setDate(end.getDate() + 1);
+        }
+        end.setHours(config.endHour, 0, 0, 0);
+        
         const diff = end - now;
         const hh = Math.floor(diff / 3600000);
         const mm = Math.floor((diff % 3600000) / 60000);
@@ -278,7 +292,7 @@ export default function App() {
     link.click();
   };
 
-  // --- FIXED LOADING SCREEN ---
+  // --- FIXED LOADING SCREEN (Full Screen Overlay) ---
   if (loading && view !== 'success') {
     return (
       <div className="fixed inset-0 w-full h-full bg-[#01040f] z-[999] flex flex-col items-center justify-center text-amber-500 overflow-hidden">
@@ -292,15 +306,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[#01040f] text-slate-100 font-sans selection:bg-amber-500/30 overflow-x-hidden flex flex-col items-center py-6 sm:py-12 lg:py-20" dir="rtl">
+    <div className="min-h-screen w-full bg-[#01040f] text-slate-100 font-sans selection:bg-amber-500/30 overflow-x-hidden flex flex-col items-center justify-center py-6 sm:py-12 lg:py-20" dir="rtl">
       <AnimatedBackground />
 
-      {/* Main Container FIXED: Centered for all devices */}
+      {/* Main Container - Centered and Responsive */}
       <div className="relative z-10 w-full max-w-[95%] sm:max-w-xl md:max-w-2xl lg:max-w-4xl flex flex-col items-center mx-auto px-4 sm:px-6">
         
         {/* Unified Header */}
         {view !== 'admin_dashboard' && (
-          <header className="text-center mb-10 sm:mb-16 animate-in fade-in slide-in-from-top-10 duration-1000 flex flex-col items-center w-full">
+          <header className="text-center mb-8 sm:mb-16 animate-in fade-in slide-in-from-top-10 duration-1000 flex flex-col items-center w-full">
             <div className="relative inline-block group mb-6">
               <div className="absolute inset-0 bg-amber-500/20 rounded-full blur-3xl transition-all group-hover:bg-amber-500/40"></div>
               <div className="relative w-24 h-24 sm:w-32 lg:w-40 lg:h-40 bg-slate-900/60 backdrop-blur-2xl rounded-[2.5rem] lg:rounded-[3.5rem] flex items-center justify-center shadow-2xl border border-white/20 overflow-hidden transform hover:rotate-3 transition-transform">
@@ -322,7 +336,6 @@ export default function App() {
         {/* --- View: Home --- */}
         {view === 'home' && (
           <main className="space-y-6 sm:space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-700 w-full flex flex-col items-center">
-            {/* Status Bar */}
             <div className={`group w-full max-w-2xl p-1 rounded-3xl bg-gradient-to-r ${isLive ? 'from-emerald-500/40 via-emerald-400/20 to-emerald-800/40' : 'from-rose-500/40 via-rose-400/20 to-rose-800/40'} border border-white/10 shadow-2xl backdrop-blur-md`}>
               <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 gap-4 rounded-2xl bg-slate-950/60">
                 <div className="flex items-center gap-4">
@@ -338,7 +351,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Question Card */}
             <div className="bg-slate-900/40 w-full max-w-2xl backdrop-blur-3xl border border-white/10 rounded-[2.5rem] sm:rounded-[3.5rem] p-8 sm:p-12 shadow-[0_0_80px_-15px_rgba(245,158,11,0.2)] relative overflow-hidden group text-center flex flex-col items-center">
               <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px]"></div>
               <div className="flex items-center justify-center gap-4 mb-8">
@@ -366,7 +378,7 @@ export default function App() {
         {/* --- View: Form --- */}
         {view === 'form' && (
           <main className="bg-slate-900/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] sm:rounded-[3.5rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-left-12 duration-700 w-full max-w-3xl flex flex-col items-center mx-auto">
-            <div className="w-full flex justify-between items-center mb-10 gap-4">
+            <div className="w-full flex flex-col sm:flex-row justify-between items-center mb-10 gap-4">
               <h2 className="text-2xl sm:text-4xl font-black text-white underline decoration-amber-500/20">سجل بياناتك للمشاركة</h2>
               <button onClick={() => setView('home')} className="text-slate-400 hover:text-amber-400 flex items-center gap-2 text-sm sm:text-base font-black transition-all">
                 <ChevronRight size={24} /> العودة
@@ -393,11 +405,11 @@ export default function App() {
             <h2 className="text-4xl sm:text-6xl font-black text-white mb-6 tracking-tight">تم التسجيل بنجاح!</h2>
             <div className="bg-slate-950/80 w-full max-w-2xl rounded-[3.5rem] p-10 mb-12 border border-white/10 shadow-inner flex flex-col items-center">
               <p className="text-amber-400/60 mb-5 font-black uppercase tracking-[0.5em] text-sm">رقم السحب الخاص بك</p>
-              <p className="text-7xl sm:text-9xl font-black text-amber-500 drop-shadow-[0_0_40px_rgba(245,158,11,0.5)]">#{uniqueId}</p>
+              <p className="text-7xl sm:text-9xl font-black text-amber-500 drop-shadow-[0_0_40px_rgba(245,158,11,0.5)] tracking-tighter">#{uniqueId}</p>
               <p className="mt-8 text-amber-400/80 text-lg font-black tracking-wide flex items-center justify-center gap-3"><Camera size={24}/> يرجى تصوير الشاشة (سكرين شوت)</p>
             </div>
-            <div className="space-y-6 w-full max-w-md">
-              <a href={config.pageLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-5 w-full py-7 bg-gradient-to-r from-[#1877F2] to-[#0a51b5] text-white rounded-[2.5rem] font-black text-2xl shadow-2xl hover:brightness-110 transition-all"><Facebook size={32} /> تابع النتائج على فيسبوك</a>
+            <div className="space-y-6 w-full max-w-md flex flex-col items-center">
+              <a href={config.pageLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-5 w-full py-6 sm:py-7 bg-gradient-to-r from-[#1877F2] to-[#0a51b5] text-white rounded-[2.5rem] font-black text-xl sm:text-2xl shadow-2xl hover:brightness-110 transition-all"><Facebook size={32} /> تابع النتائج على فيسبوك</a>
               <button onClick={() => setView('home')} className="text-slate-500 text-xs font-black hover:text-amber-400 transition-colors uppercase tracking-[0.4em]">العودة للقائمة الرئيسية</button>
             </div>
           </main>
@@ -424,22 +436,23 @@ export default function App() {
                   <textarea className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 outline-none focus:border-amber-500 text-white text-xl h-40 leading-relaxed text-center" defaultValue={config.currentQuestion.text} onBlur={(e) => updateGlobalSettings({ currentQuestion: { text: e.target.value, id: Date.now() } })}></textarea>
                 </div>
                 <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-10 shadow-2xl border-t-8 border-t-emerald-500 flex flex-col items-center">
-                  <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4 w-full justify-center"><Clock size={24} className="text-emerald-500"/> الجدولة الزمنية</h3>
-                  <div className="grid grid-cols-2 gap-8 w-full">
-                    <div className="text-center"><label className="text-xs text-slate-500 font-black mb-3 block uppercase">البدء</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-emerald-400 shadow-inner" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} /></div>
-                    <div className="text-center"><label className="text-xs text-slate-500 font-black mb-3 block uppercase">الغلق</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-rose-400 shadow-inner" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} /></div>
+                  <h3 className="text-xl font-black text-white mb-8 flex items-center gap-4 w-full justify-center"><Clock size={24} className="text-emerald-500"/> الجدولة الزمنية (24h)</h3>
+                  <div className="grid grid-cols-2 gap-8 w-full text-center">
+                    <div><label className="text-xs text-slate-500 font-black mb-3 block">ساعة الفتح</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-emerald-400 shadow-inner" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} /></div>
+                    <div><label className="text-xs text-slate-500 font-black mb-3 block">ساعة الغلق</label><input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-center font-black text-3xl text-rose-400 shadow-inner" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} /></div>
                   </div>
+                  <p className="mt-4 text-xs text-slate-500 italic">ملاحظة: استخدم نظام 24 ساعة (مثلاً 20 تعني 8 مساءً، 2 تعني 2 فجراً).</p>
                 </div>
                 <div className="lg:col-span-2 bg-slate-900/60 border border-white/10 rounded-[3rem] p-10 shadow-2xl border-t-8 border-t-blue-500 grid grid-cols-1 md:grid-cols-2 gap-10 w-full">
                   <div className="space-y-6 flex flex-col items-center">
                     <h3 className="text-xl font-black text-white flex items-center gap-4 w-full justify-center"><ShieldCheck size={24} className="text-blue-500"/> الهوية</h3>
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" placeholder="رابط اللوجو" defaultValue={config.logoUrl} onBlur={(e) => updateGlobalSettings({ logoUrl: e.target.value })} />
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" placeholder="رابط الفيسبوك" defaultValue={config.pageLink} onBlur={(e) => updateGlobalSettings({ pageLink: e.target.value })} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" placeholder="رابط اللوجو" defaultValue={config.logoUrl} onBlur={(e) => updateGlobalSettings({ logoUrl: e.target.value })} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" placeholder="رابط الفيسبوك" defaultValue={config.pageLink} onBlur={(e) => updateGlobalSettings({ pageLink: e.target.value })} />
                   </div>
                   <div className="space-y-6 flex flex-col items-center">
                     <h3 className="text-xl font-black text-white flex items-center gap-4 w-full justify-center"><Key size={24} className="text-blue-400"/> تعديل الأمان</h3>
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" placeholder="يوزر الإدارة" onBlur={e => e.target.value && updateGlobalSettings({adminUser: e.target.value})} />
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center" type="password" placeholder="باسورد جديد" onBlur={e => e.target.value && updateAdminPass(e.target.value)} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" placeholder="يوزر الإدارة" onBlur={e => e.target.value && updateGlobalSettings({adminUser: e.target.value})} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" type="password" placeholder="باسورد جديد" onBlur={e => e.target.value && updateAdminPass(e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -448,7 +461,7 @@ export default function App() {
                 <div className="bg-slate-900/60 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-2xl w-full">
                   <div className="relative w-full md:w-96">
                     <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500" size={20} />
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl py-4 pr-14 pl-6 outline-none focus:border-amber-500 text-lg text-center shadow-inner" placeholder="ابحث بالاسم أو الرقم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl py-4 pr-14 pl-6 outline-none focus:border-amber-500 text-lg text-center shadow-inner font-bold" placeholder="ابحث بالاسم أو الرقم..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                   </div>
                   <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-2xl font-black transition-all flex items-center gap-3 shadow-xl w-full md:w-auto"><Download size={24} /> تحميل Excel</button>
                 </div>
@@ -473,15 +486,15 @@ export default function App() {
                               <div className="text-slate-400 text-sm font-bold">{res.phone}</div>
                               <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-xs hover:underline flex justify-center gap-1 mt-1"><Facebook size={12}/> بروفايل</a>
                             </td>
-                            <td className="px-6 py-6 max-w-xs text-center text-slate-300 text-sm italic leading-relaxed">"{res.answer}"</td>
+                            <td className="px-6 py-6 max-w-xs text-center text-slate-300 text-sm italic leading-relaxed font-medium">"{res.answer}"</td>
                             <td className="px-6 py-6 text-center">
-                              <button onClick={() => toggleVerify(res.id, res.verified)} className={`px-5 py-3 rounded-xl font-black text-xs transition-all border ${res.verified ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-lg shadow-emerald-500/10' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}>
+                              <button onClick={() => toggleVerify(res.id, res.verified)} className={`px-5 py-3 rounded-xl font-black text-xs transition-all border ${res.verified ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-lg' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}>
                                 {res.verified ? 'مستوفي الشروط' : 'قيد المراجعة'}
                               </button>
                             </td>
                             <td className="px-6 py-6 text-center"><button onClick={() => deleteResponse(res.id)} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all active:scale-90 group-hover:opacity-100 opacity-20 shadow-lg"><Trash2 size={20} /></button></td>
                           </tr>
-                        )) : <tr><td colSpan="5" className="px-6 py-32 text-center text-slate-500 font-black tracking-widest text-2xl">لا يوجد بيانات حالياً</td></tr>}
+                        )) : <tr><td colSpan="5" className="px-6 py-32 text-center text-slate-500 font-black tracking-widest text-2xl uppercase">لا يوجد بيانات حالياً</td></tr>}
                       </tbody>
                     </table>
                   </div>
@@ -500,7 +513,7 @@ export default function App() {
               </button>
             </div>
             <div className="text-center mb-8 flex flex-col items-center">
-               <div className="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mb-4 border border-amber-500/20 shadow-xl self-center"><Lock size={32} /></div>
+               <div className="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mb-4 border border-amber-500/20 shadow-xl"><Lock size={32} /></div>
                <h2 className="text-2xl font-black text-white tracking-tighter uppercase">بوابة المسؤولين</h2>
             </div>
             <form onSubmit={handleAdminLogin} className="space-y-6 w-full flex flex-col items-center">
