@@ -41,10 +41,11 @@ import {
   Search,
   Trash2,
   Users,
-  LayoutDashboard
+  LayoutDashboard,
+  Calendar
 } from 'lucide-react';
 
-// --- Firebase Configuration ---
+// --- إعدادات فايربيز ---
 const firebaseConfig = {
   apiKey: "AIzaSyB7XSdwMXBwq-zPscIGRR5m-E37JwaQu4M",
   authDomain: "ramadancontest.firebaseapp.com",
@@ -60,7 +61,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'ramadan-contest-2024';
 
-// --- Utility: SHA-256 Password Hashing ---
+// --- دالة تشفير كلمة المرور ---
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -69,13 +70,13 @@ async function hashPassword(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- Component: Advanced Professional Background ---
+// --- مكون الخلفية الاحترافية المتحركة ---
 const AnimatedBackground = () => {
-  const stars = useMemo(() => Array.from({ length: 120 }).map((_, i) => ({
+  const stars = useMemo(() => Array.from({ length: 150 }).map((_, i) => ({
     id: i,
     top: `${Math.random() * 100}%`,
     left: `${Math.random() * 100}%`,
-    size: Math.random() * 2.5 + 0.5,
+    size: Math.random() * 2 + 0.5,
     duration: `${Math.random() * 4 + 2}s`,
     delay: `${Math.random() * 5}s`,
   })), []);
@@ -89,7 +90,7 @@ const AnimatedBackground = () => {
         }
         @keyframes twinkle {
           0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.9; transform: scale(1.3); }
+          50% { opacity: 1; transform: scale(1.3); }
         }
         @keyframes shootingStar {
           0% { transform: translateX(0) translateY(0) rotate(45deg) scale(0); opacity: 0; }
@@ -112,7 +113,7 @@ const AnimatedBackground = () => {
         }
         .magical-glow {
           background: conic-gradient(from 0deg at 50% 50%, #fbbf24, #d97706, #020617, #d97706, #fbbf24);
-          animation: spin-slow 10s linear infinite;
+          animation: spin-slow 15s linear infinite;
         }
       `}</style>
       
@@ -126,8 +127,8 @@ const AnimatedBackground = () => {
       <div className="shooting-star" style={{ top: '5%', right: '10%', animationDelay: '1s' }}></div>
       <div className="shooting-star" style={{ top: '20%', right: '40%', animationDelay: '6s' }}></div>
 
-      <div className="absolute -top-10 -left-10 lg:top-10 lg:left-10 text-amber-500/10 lg:text-amber-500/30 animate-moon-ultra transition-all duration-1000">
-        <Moon size={400} fill="currentColor" />
+      <div className="absolute -top-20 -left-20 lg:top-10 lg:left-10 text-amber-500/10 lg:text-amber-500/30 animate-moon-ultra transition-all duration-1000">
+        <Moon size={450} fill="currentColor" />
       </div>
     </div>
   );
@@ -158,6 +159,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', facebook: '', answer: '' });
 
+  // 1. تسجيل الدخول المخفي للمشتركين
   useEffect(() => {
     const initAuth = async () => {
       try { await signInAnonymously(auth); } catch (err) { console.error("Auth error:", err); }
@@ -167,6 +169,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // 2. مزامنة الإعدادات الحية
   useEffect(() => {
     if (!user) return;
     const configDoc = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
@@ -181,6 +184,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
+  // 3. جلب بيانات المشتركين للإدارة
   useEffect(() => {
     if (!user || view !== 'admin_dashboard') return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
@@ -191,6 +195,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user, view]);
 
+  // 4. منطق الوقت المطور (يدعم فترات بعد منتصف الليل)
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -220,6 +225,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [config.startHour, config.endHour]);
 
+  // 5. حفظ البيانات الجديد (محمي تماماً من الكتابة فوق البيانات القديمة)
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!isLive || !user) return;
@@ -229,22 +235,34 @@ export default function App() {
       await updateDoc(configRef, { counter: increment(1) });
       const snap = await getDoc(configRef);
       const newId = snap.data().counter;
-      const responseRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', `${newId}`);
-      await setDoc(responseRef, { 
-        ...formData, uniqueId: newId, timestamp: new Date().toISOString(), userId: user.uid, verified: false 
+      
+      // التعديل الجوهري: استخدام `collection` لإنشاء ID عشوائي للملف حتى لا يُمسح أي ملف قديم نهائياً
+      const responsesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
+      const newResponseDoc = doc(responsesCollectionRef); // يولد معرف عشوائي
+
+      await setDoc(newResponseDoc, { 
+        ...formData, 
+        uniqueId: newId, 
+        questionText: config.currentQuestion.text, // حفظ نص السؤال الذي تمت الإجابة عليه
+        submitDate: new Date().toLocaleDateString('ar-EG'), // حفظ تاريخ المشاركة
+        timestamp: new Date().toISOString(), 
+        userId: user.uid, 
+        verified: false 
       });
+      
       setUniqueId(newId);
       setView('success');
     } catch (err) { console.error("Submission failed:", err); } finally { setLoading(false); }
   };
 
+  // 6. التحكم الخاص بالإدارة
   const toggleVerify = async (resId, currentStatus) => {
     const resRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', resId);
     await updateDoc(resRef, { verified: !currentStatus });
   };
 
   const deleteResponse = async (resId) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذا المشترك؟")) return;
+    if (!window.confirm("هل أنت متأكد من حذف هذا المشترك؟ لا يمكن التراجع عن هذه الخطوة.")) return;
     const resRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', resId);
     await deleteDoc(resRef);
   };
@@ -275,18 +293,23 @@ export default function App() {
   const filteredResponses = responses.filter(r => 
     r.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     r.phone?.includes(searchQuery) || 
-    String(r.uniqueId).includes(searchQuery)
+    String(r.uniqueId).includes(searchQuery) ||
+    r.submitDate?.includes(searchQuery) // إمكانية البحث بالتاريخ أيضاً
   );
 
   const exportToCSV = async () => {
-    let csv = "\uFEFFرقم السحب,الاسم,الهاتف,العنوان,الفيسبوك,الإجابة,الحالة,التوقيت\n";
+    // إضافة أعمدة جديدة للإكسيل لضمان التفاصيل
+    let csv = "\uFEFFرقم السحب,الاسم,الهاتف,العنوان,الفيسبوك,سؤال المسابقة,الإجابة,حالة التحقق,تاريخ المشاركة\n";
     filteredResponses.forEach(d => {
-      csv += `${d.uniqueId},"${d.name}","${d.phone}","${d.address}","${d.facebook}","${d.answer}","${d.verified ? 'مستوفي الشروط' : 'غير محقق'}",${d.timestamp}\n`;
+      const qText = d.questionText ? d.questionText.replace(/"/g, '""') : 'غير متوفر';
+      const ansText = d.answer ? d.answer.replace(/"/g, '""') : '';
+      const sDate = d.submitDate || new Date(d.timestamp).toLocaleDateString('ar-EG');
+      csv += `${d.uniqueId},"${d.name}","${d.phone}","${d.address}","${d.facebook}","${qText}","${ansText}","${d.verified ? 'مستوفي الشروط' : 'غير محقق'}","${sDate}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `نتائج_المسابقة_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute("download", `نتائج_مسابقة_رمضان_${new Date().toLocaleDateString()}.csv`);
     link.click();
   };
 
@@ -306,7 +329,7 @@ export default function App() {
     <div className="min-h-screen w-full bg-[#010413] text-slate-100 font-sans selection:bg-amber-500/30 overflow-x-hidden flex items-center justify-center p-4 sm:p-8 lg:p-12" dir="rtl">
       <AnimatedBackground />
 
-      <div className="relative z-10 w-full max-w-xl md:max-w-3xl lg:max-w-5xl flex flex-col items-center justify-center min-h-full">
+      <div className="relative z-10 w-full max-w-xl md:max-w-3xl lg:max-w-6xl flex flex-col items-center justify-center min-h-full">
         
         {/* Professional Header Section */}
         {view !== 'admin_dashboard' && (
@@ -349,9 +372,9 @@ export default function App() {
             </div>
 
             <div className="relative w-full group">
-              <div className="absolute -inset-[2px] magical-glow rounded-[4rem] opacity-30 blur-sm group-hover:opacity-60 transition-opacity duration-1000"></div>
+              <div className="absolute -inset-[2px] magical-glow rounded-[3.5rem] sm:rounded-[4rem] opacity-30 blur-sm group-hover:opacity-60 transition-opacity duration-1000"></div>
               
-              <div className="relative bg-slate-950/80 w-full backdrop-blur-3xl border border-white/5 rounded-[4rem] p-8 sm:p-14 lg:p-20 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] flex flex-col items-center text-center overflow-hidden">
+              <div className="relative bg-slate-950/80 w-full backdrop-blur-3xl border border-white/5 rounded-[3.5rem] sm:rounded-[4rem] p-6 sm:p-14 lg:p-20 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] flex flex-col items-center text-center overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/5 rounded-full blur-[150px]"></div>
                 
                 <div className="flex items-center justify-center gap-4 mb-6 lg:mb-8">
@@ -359,23 +382,23 @@ export default function App() {
                   <h2 className="text-amber-400 font-black text-xl lg:text-2xl italic uppercase tracking-[0.2em] underline decoration-amber-500/20 underline-offset-8">سؤال اليوم</h2>
                 </div>
 
-                <p className="text-3xl sm:text-4xl lg:text-[4rem] font-black leading-[1.1] mb-8 lg:mb-10 text-slate-50 min-h-fit px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                <p className="text-2xl sm:text-4xl lg:text-[4rem] font-black leading-[1.2] mb-8 lg:mb-10 text-slate-50 min-h-fit px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                   {isLive ? config.currentQuestion.text : `ننتظركم يومياً في تمام الساعة ${config.startHour > 12 ? config.startHour - 12 : config.startHour} مساءً`}
                 </p>
 
                 {isLive ? (
-                  <button onClick={() => setView('form')} className="relative overflow-hidden w-full max-w-lg bg-gradient-to-br from-amber-300 via-amber-500 to-amber-800 text-[#010413] font-black py-6 lg:py-8 rounded-[3rem] flex items-center justify-center gap-6 transition-all hover:scale-[1.05] active:scale-[0.95] shadow-[0_30px_80px_-15px_rgba(245,158,11,0.6)] text-2xl lg:text-4xl group/btn">
+                  <button onClick={() => setView('form')} className="relative overflow-hidden w-full max-w-lg bg-gradient-to-br from-amber-300 via-amber-500 to-amber-800 text-[#010413] font-black py-5 lg:py-7 rounded-[2.5rem] flex items-center justify-center gap-6 transition-all hover:scale-[1.05] active:scale-[0.95] shadow-[0_30px_80px_-15px_rgba(245,158,11,0.6)] text-xl lg:text-3xl group/btn">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover/btn:animate-[shimmer_2s_infinite]"></div>
                     <span>اشترك الآن واربح</span>
-                    <ChevronLeft size={40} className="group-hover/btn:-translate-x-3 transition-transform duration-500" />
+                    <ChevronLeft size={32} className="group-hover/btn:-translate-x-3 transition-transform duration-500" />
                   </button>
                 ) : (
-                  <div className="text-center p-10 bg-white/5 rounded-[4rem] border border-white/10 shadow-inner w-full backdrop-blur-md">
-                    <p className="text-amber-100/60 text-lg lg:text-2xl font-bold leading-relaxed">
+                  <div className="text-center p-8 bg-white/5 rounded-[3rem] border border-white/10 shadow-inner w-full backdrop-blur-md">
+                    <p className="text-amber-100/60 text-base lg:text-2xl font-bold leading-relaxed">
                       المسابقة متاحة يومياً من <br className="lg:hidden" />
-                      <span className="text-amber-400 font-black text-3xl lg:text-5xl mx-2 underline decoration-amber-500/40 tracking-tighter">{config.startHour > 12 ? config.startHour - 12 : config.startHour}</span> 
+                      <span className="text-amber-400 font-black text-2xl lg:text-4xl mx-2 underline decoration-amber-500/40 tracking-tighter">{config.startHour > 12 ? config.startHour - 12 : config.startHour}</span> 
                       إلى 
-                      <span className="text-amber-400 font-black text-3xl lg:text-5xl mx-2 underline decoration-amber-500/40 tracking-tighter">{config.endHour > 12 ? config.endHour - 12 : config.endHour}</span> 
+                      <span className="text-amber-400 font-black text-2xl lg:text-4xl mx-2 underline decoration-amber-500/40 tracking-tighter">{config.endHour > 12 ? config.endHour - 12 : config.endHour}</span> 
                       مساءً
                     </p>
                   </div>
@@ -387,48 +410,48 @@ export default function App() {
 
         {/* --- View: Form --- */}
         {view === 'form' && (
-          <main className="bg-slate-950/80 backdrop-blur-3xl border border-white/10 rounded-[3.5rem] p-8 lg:p-20 shadow-[0_50px_100px_rgba(0,0,0,1)] animate-in slide-in-from-left-12 duration-1000 w-full max-w-4xl mx-auto flex flex-col items-center">
-            <div className="w-full flex flex-col sm:flex-row justify-between items-center mb-10 lg:mb-14 gap-6">
+          <main className="bg-slate-950/80 backdrop-blur-3xl border border-white/10 rounded-[3.5rem] p-6 sm:p-16 lg:p-20 shadow-[0_50px_100px_rgba(0,0,0,1)] animate-in slide-in-from-left-12 duration-1000 w-full max-w-5xl flex flex-col items-center mx-auto">
+            <div className="w-full flex flex-col sm:flex-row justify-between items-center mb-10 lg:mb-14 gap-4 sm:gap-6">
               <div className="flex items-center gap-4 lg:gap-6">
-                <div className="p-4 lg:p-5 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-500">
-                   <Users size={32} className="lg:size-12"/>
+                <div className="p-3 lg:p-5 bg-amber-500/10 rounded-2xl border border-amber-500/20 text-amber-500">
+                   <Users size={28} className="lg:size-12"/>
                 </div>
-                <h2 className="text-3xl lg:text-6xl font-black text-white tracking-tighter">بيانات المشاركة</h2>
+                <h2 className="text-2xl sm:text-4xl lg:text-6xl font-black text-white tracking-tighter">بيانات المشاركة</h2>
               </div>
-              <button onClick={() => setView('home')} className="text-slate-400 hover:text-amber-400 flex items-center gap-3 text-lg font-black transition-all bg-white/5 px-8 py-3 rounded-[2rem] border border-white/5">
-                <ChevronRight size={24} /> رجوع
+              <button onClick={() => setView('home')} className="text-slate-400 hover:text-amber-400 flex items-center gap-2 text-base lg:text-xl font-black transition-all bg-white/5 px-6 py-3 rounded-[1.5rem] border border-white/5">
+                <ChevronRight size={20} /> رجوع
               </button>
             </div>
             
-            <form onSubmit={handleFormSubmit} className="space-y-8 w-full flex flex-col items-center">
-              <div className="w-full space-y-6 lg:space-y-10 max-w-3xl">
+            <form onSubmit={handleFormSubmit} className="space-y-6 lg:space-y-8 w-full flex flex-col items-center">
+              <div className="w-full space-y-4 lg:space-y-8 max-w-3xl">
                 <div className="relative group">
-                  <User className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all duration-500" size={24} />
-                  <input required className="w-full bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-6 pr-16 pl-10 focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-xl lg:text-2xl font-black text-center placeholder:text-slate-700" placeholder="الاسم الثلاثي كاملاً كما في البطاقة" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                  <User className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all duration-500" size={20} />
+                  <input required className="w-full bg-slate-900/50 border border-white/10 rounded-[1.8rem] py-4 sm:py-6 pr-14 pl-6 focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-lg lg:text-2xl font-bold text-center placeholder:text-slate-700" placeholder="الاسم الثلاثي كاملاً كما في البطاقة" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10 w-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8 w-full">
                   <div className="relative group">
-                    <Phone className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all" size={24} />
-                    <input required type="tel" className="w-full bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-6 pr-16 pl-10 focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-xl lg:text-2xl font-black text-center" placeholder="رقم الموبايل" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                    <Phone className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all" size={20} />
+                    <input required type="tel" className="w-full bg-slate-900/50 border border-white/10 rounded-[1.8rem] py-4 sm:py-6 pr-14 pl-6 focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-lg lg:text-2xl font-bold text-center" placeholder="رقم الموبايل" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
                   </div>
                   <div className="relative group">
-                    <Facebook className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all" size={24} />
-                    <input required className="w-full bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-6 pr-16 pl-10 focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-xl lg:text-2xl font-black text-center" placeholder="رابط الفيسبوك" value={formData.facebook} onChange={e => setFormData({...formData, facebook: e.target.value})} />
+                    <Facebook className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all" size={20} />
+                    <input required className="w-full bg-slate-900/50 border border-white/10 rounded-[1.8rem] py-4 sm:py-6 pr-14 pl-6 focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-lg lg:text-2xl font-bold text-center" placeholder="رابط الفيسبوك" value={formData.facebook} onChange={e => setFormData({...formData, facebook: e.target.value})} />
                   </div>
                 </div>
                 
                 <div className="relative group">
-                  <MapPin className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all" size={24} />
-                  <input required className="w-full bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-6 pr-16 pl-10 focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-xl lg:text-2xl font-black text-center" placeholder="العنوان (المحافظة / المدينة)" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                  <MapPin className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-all" size={20} />
+                  <input required className="w-full bg-slate-900/50 border border-white/10 rounded-[1.8rem] py-4 sm:py-6 pr-14 pl-6 focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-lg lg:text-2xl font-bold text-center" placeholder="العنوان (المحافظة / المدينة)" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
                 </div>
                 
                 <div className="relative">
-                  <textarea required rows="4" className="w-full bg-slate-900/50 border border-white/10 rounded-[3rem] py-8 px-10 focus:ring-8 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-2xl font-medium text-center leading-relaxed placeholder:text-slate-700 shadow-inner" placeholder="اكتب إجابتك هنا..." value={formData.answer} onChange={e => setFormData({...formData, answer: e.target.value})}></textarea>
+                  <textarea required rows="4" className="w-full bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-6 sm:py-8 px-8 focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500/60 outline-none transition-all text-lg lg:text-2xl font-medium text-center leading-relaxed placeholder:text-slate-700 shadow-inner" placeholder="اكتب إجابتك هنا..." value={formData.answer} onChange={e => setFormData({...formData, answer: e.target.value})}></textarea>
                 </div>
               </div>
 
-              <button type="submit" disabled={loading} className="w-full max-w-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-900 text-white font-black py-7 lg:py-8 rounded-[3.5rem] text-2xl lg:text-3xl shadow-[0_30px_70px_-10px_rgba(16,185,129,0.5)] active:scale-95 hover:scale-[1.03] transition-all flex items-center justify-center gap-5">
+              <button type="submit" disabled={loading} className="w-full max-w-xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-900 text-white font-black py-6 sm:py-8 rounded-[2.5rem] text-xl lg:text-3xl shadow-[0_30px_70px_-10px_rgba(16,185,129,0.5)] active:scale-95 hover:scale-[1.03] transition-all flex items-center justify-center gap-5">
                 {loading ? <Sparkles className="animate-spin" size={32} /> : <><Send size={32} /> إرسال ودخول السحب</>}
               </button>
             </form>
@@ -437,128 +460,135 @@ export default function App() {
 
         {/* --- View: Success --- */}
         {view === 'success' && (
-          <main className="bg-slate-950/90 backdrop-blur-3xl border-2 border-emerald-500/40 rounded-[4rem] lg:rounded-[5rem] p-10 sm:p-20 text-center shadow-[0_0_150px_-20px_rgba(16,185,129,0.3)] animate-in zoom-in-95 duration-1000 w-full max-w-4xl flex flex-col items-center mx-auto relative overflow-hidden">
-            <div className="w-32 lg:w-40 h-32 lg:h-40 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-10 shadow-[0_0_80px_rgba(16,185,129,0.4)] border border-emerald-400/30">
-               <CheckCircle2 size={80} className="animate-bounce lg:size-[100px]" />
+          <main className="bg-slate-950/90 backdrop-blur-3xl border-2 border-emerald-500/40 rounded-[4rem] lg:rounded-[5rem] p-8 sm:p-20 text-center shadow-[0_0_150px_-20px_rgba(16,185,129,0.3)] animate-in zoom-in-95 duration-1000 w-full max-w-4xl flex flex-col items-center mx-auto relative overflow-hidden">
+            <div className="w-24 lg:w-40 h-24 lg:h-40 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mb-8 shadow-[0_0_80px_rgba(16,185,129,0.4)] border border-emerald-400/30">
+               <CheckCircle2 size={60} className="animate-bounce lg:size-[100px]" />
             </div>
-            <h2 className="text-5xl lg:text-8xl font-black text-white mb-6 tracking-tighter drop-shadow-2xl">تم بنجاح!</h2>
+            <h2 className="text-4xl lg:text-8xl font-black text-white mb-6 tracking-tighter drop-shadow-2xl">تم بنجاح!</h2>
             
-            <div className="bg-slate-900/80 w-full max-w-2xl rounded-[3.5rem] lg:rounded-[4.5rem] p-10 lg:p-16 mb-12 border border-white/10 shadow-2xl relative">
-              <p className="text-amber-400/60 mb-6 font-black uppercase tracking-[0.5em] text-sm lg:text-xl">رقم السحب الذهبي</p>
-              <p className="text-8xl lg:text-[11rem] font-black text-amber-500 drop-shadow-[0_0_60px_rgba(245,158,11,0.7)] tracking-tighter">#{uniqueId}</p>
-              <div className="mt-8 flex items-center justify-center gap-3 text-amber-400/90 bg-amber-400/5 py-5 px-8 rounded-3xl border border-amber-400/10 animate-pulse">
-                <Camera size={28}/>
-                <p className="text-xl lg:text-2xl font-black tracking-wide">التقط صورة للشاشة</p>
+            <div className="bg-slate-900/80 w-full max-w-2xl rounded-[3rem] lg:rounded-[4.5rem] p-8 lg:p-16 mb-10 border border-white/10 shadow-2xl relative">
+              <p className="text-amber-400/60 mb-4 font-black uppercase tracking-[0.5em] text-xs lg:text-xl">رقم السحب الذهبي</p>
+              <p className="text-6xl lg:text-[10rem] font-black text-amber-500 drop-shadow-[0_0_60px_rgba(245,158,11,0.7)] tracking-tighter">#{uniqueId}</p>
+              <div className="mt-8 flex items-center justify-center gap-3 text-amber-400/90 bg-amber-400/5 py-4 px-8 rounded-3xl border border-amber-400/10 animate-pulse">
+                <Camera size={24}/>
+                <p className="text-base lg:text-2xl font-black tracking-wide">التقط صورة للشاشة</p>
               </div>
             </div>
             
-            <div className="space-y-8 w-full max-w-lg">
-              <a href={config.pageLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-5 w-full py-8 bg-gradient-to-r from-[#1877F2] to-[#084291] text-white rounded-[3rem] font-black text-2xl shadow-2xl hover:scale-105 active:scale-95 transition-all"><Facebook size={40} /> صفحة النتائج</a>
-              <button onClick={() => setView('home')} className="text-slate-600 text-sm font-black hover:text-amber-500 transition-colors uppercase tracking-[0.8em]">العودة</button>
+            <div className="space-y-6 w-full max-w-lg">
+              <a href={config.pageLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-5 w-full py-6 bg-gradient-to-r from-[#1877F2] to-[#084291] text-white rounded-[2.5rem] font-black text-xl lg:text-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all"><Facebook size={32} /> صفحة النتائج</a>
+              <button onClick={() => setView('home')} className="text-slate-600 text-xs font-black hover:text-amber-500 transition-colors uppercase tracking-[0.8em]">العودة</button>
             </div>
           </main>
         )}
 
         {/* --- View: Admin Dashboard --- */}
         {view === 'admin_dashboard' && (
-          <main className="animate-in slide-in-from-bottom-12 duration-1000 space-y-12 pb-40 w-full flex flex-col items-center">
-            <div className="flex flex-col lg:flex-row items-center justify-between mb-16 w-full sticky top-0 bg-slate-950/90 backdrop-blur-3xl py-8 z-20 border-b border-white/10 px-10 rounded-b-[4rem] shadow-2xl gap-8">
-              <div className="flex flex-col lg:flex-row items-center gap-10">
-                <div className="flex items-center gap-5 text-amber-400">
-                  <LayoutDashboard size={48} />
-                  <h2 className="text-4xl font-black tracking-tighter uppercase">التحكم</h2>
+          <main className="animate-in slide-in-from-bottom-12 duration-1000 space-y-8 pb-40 w-full flex flex-col items-center">
+            <div className="flex flex-col lg:flex-row items-center justify-between mb-8 lg:mb-16 w-full sticky top-0 bg-slate-950/90 backdrop-blur-3xl py-6 lg:py-8 z-20 border-b border-white/10 px-6 lg:px-10 rounded-b-[3rem] lg:rounded-b-[4rem] shadow-2xl gap-4 lg:gap-8">
+              <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-10">
+                <div className="flex items-center gap-3 text-amber-400">
+                  <LayoutDashboard size={32} className="lg:size-12" />
+                  <h2 className="text-2xl lg:text-4xl font-black tracking-tighter uppercase">التحكم</h2>
                 </div>
-                <div className="flex bg-white/5 p-2 rounded-[2rem] border border-white/10">
-                  <button onClick={() => setAdminTab('settings')} className={`px-10 py-4 rounded-2xl font-black text-lg transition-all ${adminTab === 'settings' ? 'bg-amber-500 text-slate-950 shadow-2xl' : 'text-slate-400'}`}>الإعدادات</button>
-                  <button onClick={() => setAdminTab('responses')} className={`px-10 py-4 rounded-2xl font-black text-lg transition-all ${adminTab === 'responses' ? 'bg-amber-500 text-slate-950 shadow-2xl' : 'text-slate-400'}`}>المشاركات</button>
+                <div className="flex bg-white/5 p-1 lg:p-2 rounded-[1.5rem] border border-white/10">
+                  <button onClick={() => setAdminTab('settings')} className={`px-6 py-2 lg:px-10 lg:py-4 rounded-xl font-black text-base lg:text-lg transition-all ${adminTab === 'settings' ? 'bg-amber-500 text-slate-950 shadow-2xl' : 'text-slate-400'}`}>الإعدادات</button>
+                  <button onClick={() => setAdminTab('responses')} className={`px-6 py-2 lg:px-10 lg:py-4 rounded-xl font-black text-base lg:text-lg transition-all ${adminTab === 'responses' ? 'bg-amber-500 text-slate-950 shadow-2xl' : 'text-slate-400'}`}>المشاركات</button>
                 </div>
               </div>
-              <button onClick={() => setView('home')} className="text-rose-400 text-xl font-black bg-rose-500/10 px-12 py-5 rounded-[2.5rem] border border-rose-500/20 active:scale-95 flex items-center gap-4 transition-all hover:bg-rose-500/20"><LogOut size={24}/> خروج</button>
+              <button onClick={() => setView('home')} className="text-rose-400 text-base font-black bg-rose-500/10 px-8 py-3 rounded-[2rem] border border-rose-500/20 active:scale-95 flex items-center gap-3 transition-all hover:bg-rose-500/20"><LogOut size={20}/> خروج</button>
             </div>
 
             {adminTab === 'settings' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-in fade-in duration-700 w-full max-w-7xl">
-                <div className="bg-slate-900/60 border border-white/10 rounded-[3.5rem] p-10 shadow-2xl border-t-[10px] border-t-amber-500 flex flex-col items-center">
-                  <h3 className="text-2xl font-black text-white mb-10 flex items-center gap-4 w-full justify-center"><Send size={32} className="text-amber-500"/> نص السؤال</h3>
-                  <textarea className="w-full bg-slate-950 border border-white/10 rounded-[2.5rem] p-8 outline-none focus:border-amber-500 text-white text-2xl h-60 leading-relaxed text-center" defaultValue={config.currentQuestion.text} onBlur={(e) => updateGlobalSettings({ currentQuestion: { text: e.target.value, id: Date.now() } })}></textarea>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 animate-in fade-in duration-700 w-full max-w-7xl">
+                <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 lg:p-10 shadow-2xl border-t-[8px] border-t-amber-500 flex flex-col items-center">
+                  <h3 className="text-xl lg:text-2xl font-black text-white mb-6 lg:mb-10 flex items-center gap-4 w-full justify-center"><Send size={24} className="text-amber-500"/> نص السؤال</h3>
+                  <textarea className="w-full bg-slate-950 border border-white/10 rounded-[2rem] p-6 outline-none focus:border-amber-500 text-white text-xl lg:text-2xl h-48 leading-relaxed text-center" defaultValue={config.currentQuestion.text} onBlur={(e) => updateGlobalSettings({ currentQuestion: { text: e.target.value, id: Date.now() } })}></textarea>
                 </div>
-                <div className="bg-slate-900/60 border border-white/10 rounded-[3.5rem] p-10 shadow-2xl border-t-[10px] border-t-emerald-500 flex flex-col items-center text-center">
-                  <h3 className="text-2xl font-black text-white mb-10 flex items-center gap-4 w-full justify-center"><Clock size={32} className="text-emerald-500"/> الجدولة (24h)</h3>
-                  <div className="grid grid-cols-2 gap-10 w-full">
-                    <div className="space-y-4">
-                      <label className="text-sm text-slate-500 font-black uppercase tracking-[0.2em]">البدء</label>
-                      <input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-8 text-center font-black text-5xl text-emerald-400" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} />
+                <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 lg:p-10 shadow-2xl border-t-[8px] border-t-emerald-500 flex flex-col items-center text-center">
+                  <h3 className="text-xl lg:text-2xl font-black text-white mb-6 lg:mb-10 flex items-center gap-4 w-full justify-center"><Clock size={24} className="text-emerald-500"/> الجدولة (24h)</h3>
+                  <div className="grid grid-cols-2 gap-6 lg:gap-10 w-full">
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-500 font-black uppercase tracking-[0.2em]">البدء</label>
+                      <input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 text-center font-black text-4xl lg:text-5xl text-emerald-400" defaultValue={config.startHour} onBlur={(e) => updateGlobalSettings({ startHour: parseInt(e.target.value) })} />
                     </div>
-                    <div className="space-y-4">
-                      <label className="text-sm text-slate-500 font-black uppercase tracking-[0.2em]">الغلق</label>
-                      <input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-8 text-center font-black text-5xl text-rose-400" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} />
+                    <div className="space-y-2">
+                      <label className="text-xs text-slate-500 font-black uppercase tracking-[0.2em]">الغلق</label>
+                      <input type="number" className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 text-center font-black text-4xl lg:text-5xl text-rose-400" defaultValue={config.endHour} onBlur={(e) => updateGlobalSettings({ endHour: parseInt(e.target.value) })} />
                     </div>
                   </div>
                 </div>
-                <div className="lg:col-span-2 bg-slate-900/60 border border-white/10 rounded-[4rem] p-12 lg:p-16 shadow-2xl border-t-[10px] border-t-blue-500 grid grid-cols-1 md:grid-cols-2 gap-16 w-full">
-                  <div className="space-y-8 flex flex-col items-center">
-                    <h3 className="text-2xl font-black text-white flex items-center gap-5 w-full justify-center underline decoration-blue-500/20"><ShieldCheck size={32} className="text-blue-500"/> الهوية</h3>
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 text-xl text-center font-bold" placeholder="رابط اللوجو" defaultValue={config.logoUrl} onBlur={(e) => updateGlobalSettings({ logoUrl: e.target.value })} />
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 text-xl text-center font-bold" placeholder="رابط الفيسبوك" defaultValue={config.pageLink} onBlur={(e) => updateGlobalSettings({ pageLink: e.target.value })} />
+                <div className="lg:col-span-2 bg-slate-900/60 border border-white/10 rounded-[3rem] p-8 lg:p-16 shadow-2xl border-t-[8px] border-t-blue-500 grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-16 w-full">
+                  <div className="space-y-6 flex flex-col items-center">
+                    <h3 className="text-xl lg:text-2xl font-black text-white flex items-center gap-4 w-full justify-center underline decoration-blue-500/20"><ShieldCheck size={28} className="text-blue-500"/> الهوية</h3>
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" placeholder="رابط اللوجو" defaultValue={config.logoUrl} onBlur={(e) => updateGlobalSettings({ logoUrl: e.target.value })} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" placeholder="رابط الفيسبوك" defaultValue={config.pageLink} onBlur={(e) => updateGlobalSettings({ pageLink: e.target.value })} />
                   </div>
-                  <div className="space-y-8 flex flex-col items-center">
-                    <h3 className="text-2xl font-black text-white flex items-center gap-5 w-full justify-center underline decoration-blue-400/20"><Key size={32} className="text-blue-400"/> الأمان</h3>
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 text-xl text-center font-bold" placeholder="يوزر الإدارة" onBlur={e => e.target.value && updateGlobalSettings({adminUser: e.target.value})} />
-                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-6 text-xl text-center font-bold" type="password" placeholder="باسورد جديد" onBlur={e => e.target.value && updateAdminPass(e.target.value)} />
+                  <div className="space-y-6 flex flex-col items-center">
+                    <h3 className="text-xl lg:text-2xl font-black text-white flex items-center gap-4 w-full justify-center underline decoration-blue-400/20"><Key size={28} className="text-blue-400"/> الأمان</h3>
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" placeholder="يوزر الإدارة" onBlur={e => e.target.value && updateGlobalSettings({adminUser: e.target.value})} />
+                    <input className="w-full bg-slate-950 border border-white/10 rounded-2xl p-5 text-lg text-center font-bold" type="password" placeholder="باسورد جديد" onBlur={e => e.target.value && updateAdminPass(e.target.value)} />
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="space-y-10 animate-in fade-in duration-700 w-full max-w-7xl flex flex-col items-center px-4">
-                <div className="bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-8 flex flex-col lg:flex-row items-center justify-between gap-8 shadow-2xl w-full">
-                  <div className="relative w-full lg:w-[35rem]">
-                    <Search className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-500" size={32} />
+              <div className="space-y-8 animate-in fade-in duration-700 w-full max-w-7xl flex flex-col items-center px-2">
+                <div className="bg-slate-900/80 backdrop-blur-3xl border border-white/10 rounded-[3rem] p-6 lg:p-8 flex flex-col lg:flex-row items-center justify-between gap-6 shadow-2xl w-full">
+                  <div className="relative w-full lg:w-[30rem]">
+                    <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500" size={24} />
                     <input 
-                      className="w-full bg-slate-950 border border-white/10 rounded-[2rem] py-6 pr-16 pl-8 outline-none focus:border-amber-500 text-2xl text-center font-bold placeholder:text-slate-700" 
+                      className="w-full bg-slate-950 border border-white/10 rounded-[1.5rem] py-4 pr-14 pl-6 outline-none focus:border-amber-500 text-xl text-center font-bold placeholder:text-slate-700" 
                       placeholder="ابحث بالاسم أو الرقم..." 
                       value={searchQuery} 
                       onChange={e => setSearchQuery(e.target.value)} 
                     />
                   </div>
-                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-12 py-6 rounded-[2.5rem] font-black transition-all flex items-center gap-4 shadow-xl w-full lg:w-auto text-xl active:scale-95"><Download size={32} /> تحميل Excel</button>
+                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-[1.5rem] font-black transition-all flex items-center justify-center gap-3 shadow-xl w-full lg:w-auto text-lg active:scale-95"><Download size={24} /> استخراج البيانات</button>
                 </div>
                 
-                <div className="bg-slate-950/60 backdrop-blur-3xl border border-white/10 rounded-[4rem] overflow-hidden shadow-2xl w-full">
+                <div className="bg-slate-950/60 backdrop-blur-3xl border border-white/10 rounded-[3rem] lg:rounded-[4rem] overflow-hidden shadow-[0_60px_120px_rgba(0,0,0,1)] w-full">
                   <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-amber-500/20">
-                    <table className="w-full text-right border-collapse min-w-[1000px]">
+                    <table className="w-full text-right border-collapse min-w-[950px]">
                       <thead>
-                        <tr className="bg-white/5 text-amber-400 border-b border-white/10 uppercase tracking-[0.2em] text-sm font-black">
-                          <th className="px-10 py-8 font-black text-center">رقم السحب</th>
-                          <th className="px-10 py-8 font-black text-center">المشترك</th>
-                          <th className="px-10 py-8 font-black text-center">الإجابة</th>
-                          <th className="px-10 py-8 font-black text-center">الحالة</th>
-                          <th className="px-10 py-8 font-black text-center">حذف</th>
+                        <tr className="bg-white/5 text-amber-400 border-b border-white/10 uppercase tracking-[0.2em] text-xs font-black">
+                          <th className="px-6 py-6 font-black text-center">الرقم</th>
+                          <th className="px-6 py-6 font-black text-center">المشترك</th>
+                          <th className="px-6 py-6 font-black text-center">تاريخ المشاركة</th>
+                          <th className="px-6 py-6 font-black text-center">الإجابة</th>
+                          <th className="px-6 py-6 font-black text-center">الحالة</th>
+                          <th className="px-6 py-6 font-black text-center">حذف</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 font-bold">
                         {filteredResponses.length > 0 ? filteredResponses.map((res) => (
                           <tr key={res.id} className="hover:bg-white/[0.05] transition-colors group">
-                            <td className="px-10 py-8 text-center"><span className="font-black text-amber-500 text-4xl">#{res.uniqueId}</span></td>
-                            <td className="px-10 py-8 text-center text-white text-xl">
+                            <td className="px-6 py-6 text-center"><span className="font-black text-amber-500 text-2xl bg-amber-500/10 px-4 py-2 rounded-xl">#{res.uniqueId}</span></td>
+                            <td className="px-6 py-6 text-center text-white text-lg">
                               <div>{res.name}</div>
-                              <div className="text-emerald-400 text-sm font-mono mt-2">{res.phone}</div>
-                              <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-xs hover:underline block mt-2">فيسبوك</a>
+                              <div className="text-emerald-400 text-xs font-mono mt-1">{res.phone}</div>
+                              <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-[10px] hover:underline block mt-1">فيسبوك</a>
                             </td>
-                            <td className="px-10 py-8 max-w-sm text-center text-slate-300 text-lg leading-relaxed italic line-clamp-3">"{res.answer}"</td>
-                            <td className="px-10 py-8 text-center">
+                            <td className="px-6 py-6 text-center text-slate-300 font-bold">
+                               <div className="bg-slate-900/50 py-2 px-3 rounded-xl border border-white/5 text-sm flex items-center justify-center gap-2">
+                                  <Calendar size={14} className="text-amber-500"/>
+                                  {res.submitDate || new Date(res.timestamp).toLocaleDateString('ar-EG')}
+                               </div>
+                            </td>
+                            <td className="px-6 py-6 max-w-[250px] text-center text-slate-300 text-sm leading-relaxed italic line-clamp-3 font-medium">"{res.answer}"</td>
+                            <td className="px-6 py-6 text-center">
                               <button 
                                 onClick={() => toggleVerify(res.id, res.verified)} 
-                                className={`mx-auto px-8 py-4 rounded-3xl font-black text-sm transition-all border flex items-center gap-3 shadow-2xl ${res.verified ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}
+                                className={`mx-auto px-5 py-3 rounded-2xl font-black text-xs transition-all border flex items-center gap-2 shadow-2xl ${res.verified ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}
                               >
-                                {res.verified ? <><CheckCircle2 size={24}/> مستوفي</> : <><div className="w-5 h-5 rounded-full border-2 border-slate-700"/> مراجعة</>}
+                                {res.verified ? <><CheckCircle2 size={18}/> مستوفي</> : <><div className="w-4 h-4 rounded-full border border-slate-700"/> مراجعة</>}
                               </button>
                             </td>
-                            <td className="px-10 py-8 text-center">
-                              <button onClick={() => deleteResponse(res.id)} className="p-6 text-rose-500 hover:bg-rose-500/10 rounded-3xl transition-all opacity-0 group-hover:opacity-100 shadow-xl"><Trash2 size={32} /></button>
+                            <td className="px-6 py-6 text-center">
+                              <button onClick={() => deleteResponse(res.id)} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all opacity-0 group-hover:opacity-100 shadow-xl"><Trash2 size={24} /></button>
                             </td>
                           </tr>
                         )) : (
-                          <tr><td colSpan="5" className="px-10 py-48 text-center text-slate-600 font-black text-4xl tracking-[0.5em] italic uppercase">لا يوجد بيانات</td></tr>
+                          <tr><td colSpan="6" className="px-8 py-32 text-center text-slate-600 font-black text-2xl tracking-[0.3em] italic uppercase">لا يوجد بيانات حالياً</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -571,32 +601,32 @@ export default function App() {
 
         {/* --- View: Admin Login --- */}
         {view === 'admin_login' && (
-          <main className="bg-slate-950/80 backdrop-blur-3xl border border-white/10 rounded-[5rem] p-16 lg:p-24 shadow-[0_60px_120px_rgba(0,0,0,1)] animate-in fade-in duration-700 w-full max-w-3xl mx-auto flex flex-col items-center">
-            <div className="w-full flex justify-end mb-12 lg:mb-16">
-              <button onClick={() => setView('home')} className="text-slate-500 hover:text-amber-400 flex items-center gap-3 text-xl font-black transition-all bg-white/5 px-8 py-4 rounded-3xl border border-white/5">
-                <ChevronRight size={28} /> عودة
+          <main className="bg-slate-950/80 backdrop-blur-3xl border border-white/10 rounded-[4rem] p-10 lg:p-20 shadow-[0_60px_120px_rgba(0,0,0,1)] animate-in fade-in duration-700 w-full max-w-2xl mx-auto flex flex-col items-center">
+            <div className="w-full flex justify-end mb-8 lg:mb-12">
+              <button onClick={() => setView('home')} className="text-slate-500 hover:text-amber-400 flex items-center gap-2 text-base font-black transition-all bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
+                <ChevronRight size={20} /> عودة
               </button>
             </div>
-            <div className="text-center mb-16 flex flex-col items-center">
-               <div className="w-20 h-20 lg:w-28 lg:h-28 bg-amber-500/10 text-amber-400 rounded-3xl flex items-center justify-center mb-8 border border-amber-500/20 shadow-2xl self-center"><Lock size={48} /></div>
-               <h2 className="text-4xl lg:text-5xl font-black text-white tracking-tighter uppercase">بوابة الدخول</h2>
+            <div className="text-center mb-10 flex flex-col items-center">
+               <div className="w-20 h-20 lg:w-24 lg:h-24 bg-amber-500/10 text-amber-400 rounded-3xl flex items-center justify-center mb-6 border border-amber-500/20 shadow-2xl self-center"><Lock size={40} /></div>
+               <h2 className="text-3xl lg:text-4xl font-black text-white tracking-tighter uppercase text-center">بوابة الدخول</h2>
             </div>
-            <form onSubmit={handleAdminLogin} className="space-y-10 w-full flex flex-col items-center">
-              <input required className="w-full max-w-lg bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-8 px-10 outline-none focus:border-amber-500 text-center font-bold text-3xl shadow-inner tracking-widest placeholder:text-slate-800" placeholder="اليوزر" value={loginData.user} onChange={e => setLoginData({...loginData, user: e.target.value})} />
-              <input required type="password" className="w-full max-w-lg bg-slate-900/50 border border-white/10 rounded-[2.5rem] py-8 px-10 outline-none focus:border-amber-500 text-center font-bold text-3xl shadow-inner tracking-widest placeholder:text-slate-800" placeholder="الباسورد" value={loginData.pass} onChange={e => setLoginData({...loginData, pass: e.target.value})} />
-              {loginError && <p className="text-rose-500 text-xl text-center font-black bg-rose-500/10 py-4 rounded-2xl border border-rose-500/20 w-full">{loginError}</p>}
-              <button type="submit" className="w-full max-w-lg bg-amber-500 text-[#010413] font-black py-8 rounded-[3rem] shadow-[0_30px_70px_rgba(245,158,11,0.5)] hover:scale-105 active:scale-95 transition-all text-3xl">دخول آمن</button>
+            <form onSubmit={handleAdminLogin} className="space-y-8 w-full flex flex-col items-center">
+              <input required className="w-full max-w-md bg-slate-900/50 border border-white/10 rounded-[2rem] py-6 px-10 outline-none focus:border-amber-500 text-center font-bold text-2xl shadow-inner tracking-widest placeholder:text-slate-800" placeholder="اليوزر" value={loginData.user} onChange={e => setLoginData({...loginData, user: e.target.value})} />
+              <input required type="password" className="w-full max-w-md bg-slate-900/50 border border-white/10 rounded-[2rem] py-6 px-10 outline-none focus:border-amber-500 text-center font-bold text-2xl shadow-inner tracking-widest placeholder:text-slate-800" placeholder="الباسورد" value={loginData.pass} onChange={e => setLoginData({...loginData, pass: e.target.value})} />
+              {loginError && <p className="text-rose-500 text-lg text-center font-black bg-rose-500/10 py-4 rounded-2xl border border-rose-500/20 w-full">{loginError}</p>}
+              <button type="submit" className="w-full max-w-md bg-amber-500 text-[#010413] font-black py-6 rounded-[2.5rem] shadow-[0_20px_50px_rgba(245,158,11,0.5)] hover:scale-105 active:scale-95 transition-all text-2xl">دخول آمن</button>
             </form>
           </main>
         )}
 
         {/* Premium Professional Footer */}
         {view === 'home' && (
-          <footer className="mt-16 lg:mt-24 text-center relative z-10 opacity-30 hover:opacity-100 transition-all duration-1000 delay-500 pb-12 w-full flex flex-col items-center">
-            <button onClick={() => setView('admin_login')} className="text-[14px] text-slate-500 hover:text-amber-500 transition-all tracking-[1em] flex items-center justify-center gap-6 mx-auto uppercase font-black italic group py-4 hover:tracking-[1.2em] duration-700">
-              <Lock size={16} className="group-hover:animate-bounce" /> Control Portal
+          <footer className="mt-12 lg:mt-20 text-center relative z-10 opacity-30 hover:opacity-100 transition-all duration-1000 delay-500 pb-10 w-full flex flex-col items-center">
+            <button onClick={() => setView('admin_login')} className="text-[12px] text-slate-500 hover:text-amber-500 transition-all tracking-[1em] flex items-center justify-center gap-4 mx-auto uppercase font-black italic group py-3 hover:tracking-[1.2em] duration-700">
+              <Lock size={14} className="group-hover:animate-bounce" /> Control Portal
             </button>
-            <p className="text-slate-700 text-[12px] mt-10 font-black tracking-[0.4em] italic uppercase text-center px-6">© 2024 Ramadan Contest • Powered by Premium Design Engine</p>
+            <p className="text-slate-700 text-[10px] mt-8 font-black tracking-[0.4em] italic uppercase text-center px-4">© 2024 Ramadan Contest • Powered by Premium Design Engine</p>
           </footer>
         )}
       </div>
