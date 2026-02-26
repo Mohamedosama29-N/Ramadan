@@ -8,10 +8,10 @@ import {
   getDoc, 
   onSnapshot, 
   updateDoc, 
-  increment,
   query,
   getDocs,
-  deleteDoc
+  deleteDoc,
+  runTransaction // <-- تمت إضافة هذه الخاصية لمنع تكرار الأرقام
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { 
@@ -41,11 +41,10 @@ import {
   Search,
   Trash2,
   Users,
-  LayoutDashboard,
-  Calendar
+  LayoutDashboard
 } from 'lucide-react';
 
-// --- إعدادات فايربيز ---
+// --- Firebase Configuration ---
 const firebaseConfig = {
   apiKey: "AIzaSyB7XSdwMXBwq-zPscIGRR5m-E37JwaQu4M",
   authDomain: "ramadancontest.firebaseapp.com",
@@ -61,7 +60,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = 'ramadan-contest-2024';
 
-// --- دالة تشفير كلمة المرور ---
+// --- Utility: SHA-256 Password Hashing ---
 async function hashPassword(password) {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
@@ -70,7 +69,7 @@ async function hashPassword(password) {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// --- مكون الخلفية الاحترافية المتحركة ---
+// --- Component: Advanced Professional Background ---
 const AnimatedBackground = () => {
   const stars = useMemo(() => Array.from({ length: 150 }).map((_, i) => ({
     id: i,
@@ -159,7 +158,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', facebook: '', answer: '' });
 
-  // 1. تسجيل الدخول المخفي للمشتركين
+  // 1. Auth Initialization
   useEffect(() => {
     const initAuth = async () => {
       try { await signInAnonymously(auth); } catch (err) { console.error("Auth error:", err); }
@@ -169,7 +168,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. مزامنة الإعدادات الحية
+  // 2. Real-time Config Sync
   useEffect(() => {
     if (!user) return;
     const configDoc = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
@@ -184,7 +183,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // 3. جلب بيانات المشتركين للإدارة
+  // 3. Admin Data Sync
   useEffect(() => {
     if (!user || view !== 'admin_dashboard') return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
@@ -195,7 +194,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user, view]);
 
-  // 4. منطق الوقت المطور (يدعم فترات بعد منتصف الليل)
+  // 4. Timer Logic
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -225,44 +224,62 @@ export default function App() {
     return () => clearInterval(timer);
   }, [config.startHour, config.endHour]);
 
-  // 5. حفظ البيانات الجديد (محمي تماماً من الكتابة فوق البيانات القديمة)
+  // 5. Submit Form - FIXED WITH TRANSACTIONS TO PREVENT OVERWRITING
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!isLive || !user) return;
     setLoading(true);
     try {
       const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
-      await updateDoc(configRef, { counter: increment(1) });
-      const snap = await getDoc(configRef);
-      const newId = snap.data().counter;
-      
-      // التعديل الجوهري: استخدام `collection` لإنشاء ID عشوائي للملف حتى لا يُمسح أي ملف قديم نهائياً
+      let newGeneratedId;
+
+      // استخدام المعاملات الآمنة (Transaction) لضمان عدم تكرار الرقم نهائياً
+      await runTransaction(db, async (transaction) => {
+        const configDoc = await transaction.get(configRef);
+        if (!configDoc.exists()) {
+          throw "Document does not exist!";
+        }
+        // جلب الرقم الحالي وزيادته بواحد
+        const currentCounter = configDoc.data().counter || 1000;
+        newGeneratedId = currentCounter + 1;
+        // تحديث الرقم في السيرفر
+        transaction.update(configRef, { counter: newGeneratedId });
+      });
+
+      // إنشاء ملف جديد كلياً بمعرف عشوائي (يمنع استبدال البيانات القديمة)
       const responsesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
-      const newResponseDoc = doc(responsesCollectionRef); // يولد معرف عشوائي
+      const newResponseDoc = doc(responsesCollectionRef);
 
       await setDoc(newResponseDoc, { 
         ...formData, 
-        uniqueId: newId, 
-        questionText: config.currentQuestion.text, // حفظ نص السؤال الذي تمت الإجابة عليه
-        submitDate: new Date().toLocaleDateString('ar-EG'), // حفظ تاريخ المشاركة
+        uniqueId: newGeneratedId, 
+        questionText: config.currentQuestion.text,
+        submitDate: new Date().toLocaleDateString('ar-EG'),
         timestamp: new Date().toISOString(), 
         userId: user.uid, 
         verified: false 
       });
-      
-      setUniqueId(newId);
+
+      setUniqueId(newGeneratedId);
       setView('success');
-    } catch (err) { console.error("Submission failed:", err); } finally { setLoading(false); }
+      // تفريغ البيانات القديمة من الذاكرة لضمان التسجيل النظيف
+      setFormData({ name: '', phone: '', address: '', facebook: '', answer: '' });
+
+    } catch (err) { 
+      console.error("Submission failed:", err); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  // 6. التحكم الخاص بالإدارة
+  // 6. Admin Actions
   const toggleVerify = async (resId, currentStatus) => {
     const resRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', resId);
     await updateDoc(resRef, { verified: !currentStatus });
   };
 
   const deleteResponse = async (resId) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذا المشترك؟ لا يمكن التراجع عن هذه الخطوة.")) return;
+    if (!window.confirm("هل أنت متأكد من حذف هذا المشترك؟ لا يمكن التراجع.")) return;
     const resRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', resId);
     await deleteDoc(resRef);
   };
@@ -294,12 +311,11 @@ export default function App() {
     r.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
     r.phone?.includes(searchQuery) || 
     String(r.uniqueId).includes(searchQuery) ||
-    r.submitDate?.includes(searchQuery) // إمكانية البحث بالتاريخ أيضاً
+    r.submitDate?.includes(searchQuery)
   );
 
   const exportToCSV = async () => {
-    // إضافة أعمدة جديدة للإكسيل لضمان التفاصيل
-    let csv = "\uFEFFرقم السحب,الاسم,الهاتف,العنوان,الفيسبوك,سؤال المسابقة,الإجابة,حالة التحقق,تاريخ المشاركة\n";
+    let csv = "\uFEFFرقم السحب,الاسم,الهاتف,العنوان,الفيسبوك,السؤال المجاب عليه,الإجابة,الحالة,تاريخ المشاركة\n";
     filteredResponses.forEach(d => {
       const qText = d.questionText ? d.questionText.replace(/"/g, '""') : 'غير متوفر';
       const ansText = d.answer ? d.answer.replace(/"/g, '""') : '';
@@ -309,7 +325,7 @@ export default function App() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `نتائج_مسابقة_رمضان_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute("download", `نتائج_مسابقة_رمضان_${new Date().toLocaleDateString('ar-EG').replace(/\//g, '-')}.csv`);
     link.click();
   };
 
@@ -382,7 +398,7 @@ export default function App() {
                   <h2 className="text-amber-400 font-black text-xl lg:text-2xl italic uppercase tracking-[0.2em] underline decoration-amber-500/20 underline-offset-8">سؤال اليوم</h2>
                 </div>
 
-                <p className="text-2xl sm:text-4xl lg:text-[4rem] font-black leading-[1.2] mb-8 lg:mb-10 text-slate-50 min-h-fit px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                <p className="text-2xl sm:text-4xl lg:text-[3.5rem] font-black leading-[1.2] mb-6 lg:mb-8 text-slate-50 min-h-fit px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                   {isLive ? config.currentQuestion.text : `ننتظركم يومياً في تمام الساعة ${config.startHour > 12 ? config.startHour - 12 : config.startHour} مساءً`}
                 </p>
 
@@ -543,52 +559,45 @@ export default function App() {
                       onChange={e => setSearchQuery(e.target.value)} 
                     />
                   </div>
-                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-[1.5rem] font-black transition-all flex items-center justify-center gap-3 shadow-xl w-full lg:w-auto text-lg active:scale-95"><Download size={24} /> استخراج البيانات</button>
+                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-[1.5rem] font-black transition-all flex items-center justify-center gap-3 shadow-xl w-full lg:w-auto text-lg active:scale-95"><Download size={24} /> تحميل Excel</button>
                 </div>
                 
                 <div className="bg-slate-950/60 backdrop-blur-3xl border border-white/10 rounded-[3rem] lg:rounded-[4rem] overflow-hidden shadow-[0_60px_120px_rgba(0,0,0,1)] w-full">
                   <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-amber-500/20">
-                    <table className="w-full text-right border-collapse min-w-[950px]">
+                    <table className="w-full text-right border-collapse min-w-[900px]">
                       <thead>
                         <tr className="bg-white/5 text-amber-400 border-b border-white/10 uppercase tracking-[0.2em] text-xs font-black">
-                          <th className="px-6 py-6 font-black text-center">الرقم</th>
-                          <th className="px-6 py-6 font-black text-center">المشترك</th>
-                          <th className="px-6 py-6 font-black text-center">تاريخ المشاركة</th>
-                          <th className="px-6 py-6 font-black text-center">الإجابة</th>
-                          <th className="px-6 py-6 font-black text-center">الحالة</th>
-                          <th className="px-6 py-6 font-black text-center">حذف</th>
+                          <th className="px-8 py-6 font-black text-center">رقم السحب</th>
+                          <th className="px-8 py-6 font-black text-center">المشترك</th>
+                          <th className="px-8 py-6 font-black text-center">الإجابة</th>
+                          <th className="px-8 py-6 font-black text-center">الحالة</th>
+                          <th className="px-8 py-6 font-black text-center">حذف</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 font-bold">
                         {filteredResponses.length > 0 ? filteredResponses.map((res) => (
                           <tr key={res.id} className="hover:bg-white/[0.05] transition-colors group">
-                            <td className="px-6 py-6 text-center"><span className="font-black text-amber-500 text-2xl bg-amber-500/10 px-4 py-2 rounded-xl">#{res.uniqueId}</span></td>
-                            <td className="px-6 py-6 text-center text-white text-lg">
+                            <td className="px-8 py-6 text-center"><span className="font-black text-amber-500 text-3xl">#{res.uniqueId}</span></td>
+                            <td className="px-8 py-6 text-center text-white text-lg">
                               <div>{res.name}</div>
                               <div className="text-emerald-400 text-xs font-mono mt-1">{res.phone}</div>
                               <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-[10px] hover:underline block mt-1">فيسبوك</a>
                             </td>
-                            <td className="px-6 py-6 text-center text-slate-300 font-bold">
-                               <div className="bg-slate-900/50 py-2 px-3 rounded-xl border border-white/5 text-sm flex items-center justify-center gap-2">
-                                  <Calendar size={14} className="text-amber-500"/>
-                                  {res.submitDate || new Date(res.timestamp).toLocaleDateString('ar-EG')}
-                               </div>
-                            </td>
-                            <td className="px-6 py-6 max-w-[250px] text-center text-slate-300 text-sm leading-relaxed italic line-clamp-3 font-medium">"{res.answer}"</td>
-                            <td className="px-6 py-6 text-center">
+                            <td className="px-8 py-6 max-w-sm text-center text-slate-300 text-base leading-relaxed italic line-clamp-3 font-medium">"{res.answer}"</td>
+                            <td className="px-8 py-6 text-center">
                               <button 
                                 onClick={() => toggleVerify(res.id, res.verified)} 
-                                className={`mx-auto px-5 py-3 rounded-2xl font-black text-xs transition-all border flex items-center gap-2 shadow-2xl ${res.verified ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}
+                                className={`mx-auto px-6 py-3 rounded-2xl font-black text-xs transition-all border flex items-center gap-2 shadow-2xl ${res.verified ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}
                               >
-                                {res.verified ? <><CheckCircle2 size={18}/> مستوفي</> : <><div className="w-4 h-4 rounded-full border border-slate-700"/> مراجعة</>}
+                                {res.verified ? <><CheckCircle2 size={20}/> مستوفي</> : <><div className="w-4 h-4 rounded-full border border-slate-700"/> مراجعة</>}
                               </button>
                             </td>
-                            <td className="px-6 py-6 text-center">
-                              <button onClick={() => deleteResponse(res.id)} className="p-3 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all opacity-0 group-hover:opacity-100 shadow-xl"><Trash2 size={24} /></button>
+                            <td className="px-8 py-6 text-center">
+                              <button onClick={() => deleteResponse(res.id)} className="p-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all opacity-0 group-hover:opacity-100 shadow-xl"><Trash2 size={24} /></button>
                             </td>
                           </tr>
                         )) : (
-                          <tr><td colSpan="6" className="px-8 py-32 text-center text-slate-600 font-black text-2xl tracking-[0.3em] italic uppercase">لا يوجد بيانات حالياً</td></tr>
+                          <tr><td colSpan="5" className="px-8 py-32 text-center text-slate-600 font-black text-3xl tracking-[0.3em] italic uppercase">لا يوجد بيانات حالياً</td></tr>
                         )}
                       </tbody>
                     </table>
