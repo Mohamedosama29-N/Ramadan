@@ -11,7 +11,7 @@ import {
   query,
   getDocs,
   deleteDoc,
-  runTransaction // <-- تمت إضافة هذه الخاصية لمنع تكرار الأرقام
+  runTransaction
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { 
@@ -41,7 +41,8 @@ import {
   Search,
   Trash2,
   Users,
-  LayoutDashboard
+  LayoutDashboard,
+  Calendar
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
@@ -158,7 +159,6 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [formData, setFormData] = useState({ name: '', phone: '', address: '', facebook: '', answer: '' });
 
-  // 1. Auth Initialization
   useEffect(() => {
     const initAuth = async () => {
       try { await signInAnonymously(auth); } catch (err) { console.error("Auth error:", err); }
@@ -168,7 +168,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Real-time Config Sync
   useEffect(() => {
     if (!user) return;
     const configDoc = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
@@ -183,7 +182,6 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
-  // 3. Admin Data Sync
   useEffect(() => {
     if (!user || view !== 'admin_dashboard') return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'responses'));
@@ -194,7 +192,6 @@ export default function App() {
     return () => unsubscribe();
   }, [user, view]);
 
-  // 4. Timer Logic
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -224,7 +221,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, [config.startHour, config.endHour]);
 
-  // 5. Submit Form - FIXED WITH TRANSACTIONS TO PREVENT OVERWRITING
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!isLive || !user) return;
@@ -233,20 +229,16 @@ export default function App() {
       const configRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
       let newGeneratedId;
 
-      // استخدام المعاملات الآمنة (Transaction) لضمان عدم تكرار الرقم نهائياً
+      // إنشاء رقم فريد غير متكرر مطلقاً
       await runTransaction(db, async (transaction) => {
         const configDoc = await transaction.get(configRef);
-        if (!configDoc.exists()) {
-          throw "Document does not exist!";
-        }
-        // جلب الرقم الحالي وزيادته بواحد
+        if (!configDoc.exists()) throw "Document does not exist!";
         const currentCounter = configDoc.data().counter || 1000;
         newGeneratedId = currentCounter + 1;
-        // تحديث الرقم في السيرفر
         transaction.update(configRef, { counter: newGeneratedId });
       });
 
-      // إنشاء ملف جديد كلياً بمعرف عشوائي (يمنع استبدال البيانات القديمة)
+      // إنشاء مسار ملف جديد كلياً بمعرف عشوائي (لمنع استبدال أي بيانات قديمة)
       const responsesCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'responses');
       const newResponseDoc = doc(responsesCollectionRef);
 
@@ -254,7 +246,6 @@ export default function App() {
         ...formData, 
         uniqueId: newGeneratedId, 
         questionText: config.currentQuestion.text,
-        submitDate: new Date().toLocaleDateString('ar-EG'),
         timestamp: new Date().toISOString(), 
         userId: user.uid, 
         verified: false 
@@ -262,24 +253,26 @@ export default function App() {
 
       setUniqueId(newGeneratedId);
       setView('success');
-      // تفريغ البيانات القديمة من الذاكرة لضمان التسجيل النظيف
+      // تصفير البيانات من الذاكرة لضمان التسجيل النظيف في المرة القادمة
       setFormData({ name: '', phone: '', address: '', facebook: '', answer: '' });
 
-    } catch (err) { 
-      console.error("Submission failed:", err); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (err) { console.error("Submission failed:", err); } finally { setLoading(false); }
   };
 
-  // 6. Admin Actions
+  // دالة العودة للرئيسية مع تصفير كامل للحالة (للسماح بالتسجيل الجديد كلياً في يوم آخر)
+  const handleReturnHome = () => {
+    setView('home');
+    setUniqueId(null);
+    setFormData({ name: '', phone: '', address: '', facebook: '', answer: '' });
+  };
+
   const toggleVerify = async (resId, currentStatus) => {
     const resRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', resId);
     await updateDoc(resRef, { verified: !currentStatus });
   };
 
   const deleteResponse = async (resId) => {
-    if (!window.confirm("هل أنت متأكد من حذف هذا المشترك؟ لا يمكن التراجع.")) return;
+    if (!window.confirm("هل أنت متأكد من حذف هذا المشترك نهائياً؟")) return;
     const resRef = doc(db, 'artifacts', appId, 'public', 'data', 'responses', resId);
     await deleteDoc(resRef);
   };
@@ -307,25 +300,28 @@ export default function App() {
     await updateGlobalSettings({ adminPassHash: newHash });
   };
 
-  const filteredResponses = responses.filter(r => 
-    r.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    r.phone?.includes(searchQuery) || 
-    String(r.uniqueId).includes(searchQuery) ||
-    r.submitDate?.includes(searchQuery)
-  );
+  const filteredResponses = responses.filter(r => {
+    const searchString = searchQuery.toLowerCase();
+    const dateStr = new Date(r.timestamp).toLocaleDateString('ar-EG');
+    return r.name?.toLowerCase().includes(searchString) || 
+           r.phone?.includes(searchString) || 
+           String(r.uniqueId).includes(searchString) ||
+           dateStr.includes(searchString);
+  });
 
   const exportToCSV = async () => {
-    let csv = "\uFEFFرقم السحب,الاسم,الهاتف,العنوان,الفيسبوك,السؤال المجاب عليه,الإجابة,الحالة,تاريخ المشاركة\n";
+    let csv = "\uFEFFرقم السحب,الاسم,الهاتف,العنوان,الفيسبوك,سؤال اليوم,الإجابة,الحالة,التاريخ,الوقت\n";
     filteredResponses.forEach(d => {
       const qText = d.questionText ? d.questionText.replace(/"/g, '""') : 'غير متوفر';
       const ansText = d.answer ? d.answer.replace(/"/g, '""') : '';
-      const sDate = d.submitDate || new Date(d.timestamp).toLocaleDateString('ar-EG');
-      csv += `${d.uniqueId},"${d.name}","${d.phone}","${d.address}","${d.facebook}","${qText}","${ansText}","${d.verified ? 'مستوفي الشروط' : 'غير محقق'}","${sDate}"\n`;
+      const dateStr = new Date(d.timestamp).toLocaleDateString('ar-EG');
+      const timeStr = new Date(d.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+      csv += `${d.uniqueId},"${d.name}","${d.phone}","${d.address}","${d.facebook}","${qText}","${ansText}","${d.verified ? 'مستوفي الشروط' : 'غير محقق'}","${dateStr}","${timeStr}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `نتائج_مسابقة_رمضان_${new Date().toLocaleDateString('ar-EG').replace(/\//g, '-')}.csv`);
+    link.setAttribute("download", `نتائج_المسابقة_${new Date().toLocaleDateString('ar-EG').replace(/\//g, '-')}.csv`);
     link.click();
   };
 
@@ -364,7 +360,7 @@ export default function App() {
                 )}
               </div>
             </div>
-            <h1 className="text-4xl sm:text-6xl lg:text-[6.5rem] font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-400 to-amber-700 mb-4 lg:mb-6 drop-shadow-2xl tracking-tighter leading-tight">مسابقة رمضان</h1>
+            <h1 className="text-3xl sm:text-6xl lg:text-[6.5rem] font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-100 via-amber-400 to-amber-700 mb-4 lg:mb-6 drop-shadow-2xl tracking-tighter leading-tight">مسابقة رمضان</h1>
             <p className="text-amber-100/70 text-lg sm:text-xl lg:text-3xl font-medium tracking-wide italic text-center max-w-2xl px-6 opacity-80">رحلة إيمانية وجوائز يومية ببركة الشهر الكريم</p>
           </header>
         )}
@@ -373,7 +369,7 @@ export default function App() {
         {view === 'home' && (
           <main className="space-y-6 lg:space-y-10 animate-in fade-in slide-in-from-bottom-12 duration-1000 w-full flex flex-col items-center max-w-4xl mx-auto">
             <div className={`group w-full p-[2px] rounded-[2.5rem] bg-gradient-to-r ${isLive ? 'from-emerald-500 via-emerald-300 to-emerald-800' : 'from-rose-500 via-rose-300 to-rose-800'} shadow-2xl backdrop-blur-3xl`}>
-              <div className="flex flex-col sm:flex-row items-center justify-between px-8 py-4 sm:py-6 gap-4 rounded-[2.4rem] bg-slate-950/90 backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 sm:py-6 gap-4 rounded-[2.4rem] bg-slate-950/90 backdrop-blur-xl">
                 <div className="flex items-center gap-4">
                   <div className={`w-4 h-4 rounded-full ${isLive ? 'bg-emerald-400 shadow-[0_0_15px_#10b981] animate-ping' : 'bg-rose-400'}`}></div>
                   <span className="text-xl lg:text-2xl font-black tracking-tight uppercase">{isLive ? 'المسابقة مفتوحة الآن' : 'المسابقة مغلقة حالياً'}</span>
@@ -398,7 +394,7 @@ export default function App() {
                   <h2 className="text-amber-400 font-black text-xl lg:text-2xl italic uppercase tracking-[0.2em] underline decoration-amber-500/20 underline-offset-8">سؤال اليوم</h2>
                 </div>
 
-                <p className="text-2xl sm:text-4xl lg:text-[3.5rem] font-black leading-[1.2] mb-6 lg:mb-8 text-slate-50 min-h-fit px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
+                <p className="text-2xl sm:text-4xl lg:text-[3.5rem] font-black leading-[1.2] mb-8 lg:mb-10 text-slate-50 min-h-fit px-4 drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
                   {isLive ? config.currentQuestion.text : `ننتظركم يومياً في تمام الساعة ${config.startHour > 12 ? config.startHour - 12 : config.startHour} مساءً`}
                 </p>
 
@@ -434,7 +430,7 @@ export default function App() {
                 </div>
                 <h2 className="text-2xl sm:text-4xl lg:text-6xl font-black text-white tracking-tighter">بيانات المشاركة</h2>
               </div>
-              <button onClick={() => setView('home')} className="text-slate-400 hover:text-amber-400 flex items-center gap-2 text-base lg:text-xl font-black transition-all bg-white/5 px-6 py-3 rounded-[1.5rem] border border-white/5">
+              <button onClick={handleReturnHome} className="text-slate-400 hover:text-amber-400 flex items-center gap-2 text-base lg:text-xl font-black transition-all bg-white/5 px-6 py-3 rounded-[1.5rem] border border-white/5">
                 <ChevronRight size={20} /> رجوع
               </button>
             </div>
@@ -493,7 +489,7 @@ export default function App() {
             
             <div className="space-y-6 w-full max-w-lg">
               <a href={config.pageLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-5 w-full py-6 bg-gradient-to-r from-[#1877F2] to-[#084291] text-white rounded-[2.5rem] font-black text-xl lg:text-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all"><Facebook size={32} /> صفحة النتائج</a>
-              <button onClick={() => setView('home')} className="text-slate-600 text-xs font-black hover:text-amber-500 transition-colors uppercase tracking-[0.8em]">العودة</button>
+              <button onClick={handleReturnHome} className="text-slate-600 text-xs font-black hover:text-amber-500 transition-colors uppercase tracking-[0.8em]">العودة والمشاركة لاحقاً</button>
             </div>
           </main>
         )}
@@ -512,7 +508,7 @@ export default function App() {
                   <button onClick={() => setAdminTab('responses')} className={`px-6 py-2 lg:px-10 lg:py-4 rounded-xl font-black text-base lg:text-lg transition-all ${adminTab === 'responses' ? 'bg-amber-500 text-slate-950 shadow-2xl' : 'text-slate-400'}`}>المشاركات</button>
                 </div>
               </div>
-              <button onClick={() => setView('home')} className="text-rose-400 text-base font-black bg-rose-500/10 px-8 py-3 rounded-[2rem] border border-rose-500/20 active:scale-95 flex items-center gap-3 transition-all hover:bg-rose-500/20"><LogOut size={20}/> خروج</button>
+              <button onClick={handleReturnHome} className="text-rose-400 text-base font-black bg-rose-500/10 px-8 py-3 rounded-[2rem] border border-rose-500/20 active:scale-95 flex items-center gap-3 transition-all hover:bg-rose-500/20"><LogOut size={20}/> خروج</button>
             </div>
 
             {adminTab === 'settings' ? (
@@ -554,50 +550,57 @@ export default function App() {
                     <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500" size={24} />
                     <input 
                       className="w-full bg-slate-950 border border-white/10 rounded-[1.5rem] py-4 pr-14 pl-6 outline-none focus:border-amber-500 text-xl text-center font-bold placeholder:text-slate-700" 
-                      placeholder="ابحث بالاسم أو الرقم..." 
+                      placeholder="ابحث بالاسم، الرقم، أو التاريخ..." 
                       value={searchQuery} 
                       onChange={e => setSearchQuery(e.target.value)} 
                     />
                   </div>
-                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-[1.5rem] font-black transition-all flex items-center justify-center gap-3 shadow-xl w-full lg:w-auto text-lg active:scale-95"><Download size={24} /> تحميل Excel</button>
+                  <button onClick={exportToCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-[1.5rem] font-black transition-all flex items-center justify-center gap-3 shadow-xl w-full lg:w-auto text-lg active:scale-95"><Download size={24} /> تحميل بيانات Excel</button>
                 </div>
                 
                 <div className="bg-slate-950/60 backdrop-blur-3xl border border-white/10 rounded-[3rem] lg:rounded-[4rem] overflow-hidden shadow-[0_60px_120px_rgba(0,0,0,1)] w-full">
                   <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-amber-500/20">
-                    <table className="w-full text-right border-collapse min-w-[900px]">
+                    <table className="w-full text-right border-collapse min-w-[1100px]">
                       <thead>
                         <tr className="bg-white/5 text-amber-400 border-b border-white/10 uppercase tracking-[0.2em] text-xs font-black">
-                          <th className="px-8 py-6 font-black text-center">رقم السحب</th>
-                          <th className="px-8 py-6 font-black text-center">المشترك</th>
-                          <th className="px-8 py-6 font-black text-center">الإجابة</th>
-                          <th className="px-8 py-6 font-black text-center">الحالة</th>
-                          <th className="px-8 py-6 font-black text-center">حذف</th>
+                          <th className="px-6 py-6 font-black text-center">الرقم</th>
+                          <th className="px-6 py-6 font-black text-center">المشترك</th>
+                          <th className="px-6 py-6 font-black text-center">تاريخ المشاركة</th>
+                          <th className="px-6 py-6 font-black text-center">الإجابة</th>
+                          <th className="px-6 py-6 font-black text-center">الحالة</th>
+                          <th className="px-6 py-6 font-black text-center">حذف</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5 font-bold">
                         {filteredResponses.length > 0 ? filteredResponses.map((res) => (
                           <tr key={res.id} className="hover:bg-white/[0.05] transition-colors group">
-                            <td className="px-8 py-6 text-center"><span className="font-black text-amber-500 text-3xl">#{res.uniqueId}</span></td>
-                            <td className="px-8 py-6 text-center text-white text-lg">
+                            <td className="px-6 py-6 text-center"><span className="font-black text-amber-500 text-3xl">#{res.uniqueId}</span></td>
+                            <td className="px-6 py-6 text-center text-white text-lg">
                               <div>{res.name}</div>
                               <div className="text-emerald-400 text-xs font-mono mt-1">{res.phone}</div>
                               <a href={res.facebook?.startsWith('http') ? res.facebook : `https://${res.facebook}`} target="_blank" rel="noreferrer" className="text-blue-400 text-[10px] hover:underline block mt-1">فيسبوك</a>
                             </td>
-                            <td className="px-8 py-6 max-w-sm text-center text-slate-300 text-base leading-relaxed italic line-clamp-3 font-medium">"{res.answer}"</td>
-                            <td className="px-8 py-6 text-center">
+                            <td className="px-6 py-6 text-center text-slate-300 font-bold">
+                               <div className="bg-slate-900/50 py-3 px-4 rounded-2xl border border-white/5 text-xs flex flex-col items-center justify-center gap-1.5 shadow-inner">
+                                  <span className="flex items-center gap-1.5"><Calendar size={14} className="text-amber-500"/> {res.submitDate || new Date(res.timestamp).toLocaleDateString('ar-EG')}</span>
+                                  <span className="flex items-center gap-1.5 text-emerald-400"><Clock size={14}/> {new Date(res.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                               </div>
+                            </td>
+                            <td className="px-6 py-6 max-w-[250px] text-center text-slate-300 text-sm leading-relaxed italic line-clamp-3 font-medium">"{res.answer}"</td>
+                            <td className="px-6 py-6 text-center">
                               <button 
                                 onClick={() => toggleVerify(res.id, res.verified)} 
                                 className={`mx-auto px-6 py-3 rounded-2xl font-black text-xs transition-all border flex items-center gap-2 shadow-2xl ${res.verified ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-950 border-white/10 text-slate-500 hover:border-amber-500/50'}`}
                               >
-                                {res.verified ? <><CheckCircle2 size={20}/> مستوفي</> : <><div className="w-4 h-4 rounded-full border border-slate-700"/> مراجعة</>}
+                                {res.verified ? <><CheckCircle2 size={18}/> مستوفي</> : <><div className="w-4 h-4 rounded-full border border-slate-700"/> مراجعة</>}
                               </button>
                             </td>
-                            <td className="px-8 py-6 text-center">
+                            <td className="px-6 py-6 text-center">
                               <button onClick={() => deleteResponse(res.id)} className="p-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all opacity-0 group-hover:opacity-100 shadow-xl"><Trash2 size={24} /></button>
                             </td>
                           </tr>
                         )) : (
-                          <tr><td colSpan="5" className="px-8 py-32 text-center text-slate-600 font-black text-3xl tracking-[0.3em] italic uppercase">لا يوجد بيانات حالياً</td></tr>
+                          <tr><td colSpan="6" className="px-8 py-32 text-center text-slate-600 font-black text-3xl tracking-[0.3em] italic uppercase">لا يوجد بيانات حالياً</td></tr>
                         )}
                       </tbody>
                     </table>
@@ -612,7 +615,7 @@ export default function App() {
         {view === 'admin_login' && (
           <main className="bg-slate-950/80 backdrop-blur-3xl border border-white/10 rounded-[4rem] p-10 lg:p-20 shadow-[0_60px_120px_rgba(0,0,0,1)] animate-in fade-in duration-700 w-full max-w-2xl mx-auto flex flex-col items-center">
             <div className="w-full flex justify-end mb-8 lg:mb-12">
-              <button onClick={() => setView('home')} className="text-slate-500 hover:text-amber-400 flex items-center gap-2 text-base font-black transition-all bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
+              <button onClick={handleReturnHome} className="text-slate-500 hover:text-amber-400 flex items-center gap-2 text-base font-black transition-all bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
                 <ChevronRight size={20} /> عودة
               </button>
             </div>
